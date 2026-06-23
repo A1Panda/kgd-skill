@@ -44,6 +44,14 @@ function getRequiredEnv(name) {
   return String(value).trim();
 }
 
+function getConfigValue(envName, overrideValue) {
+  const override = overrideValue === undefined || overrideValue === null ? "" : String(overrideValue).trim();
+  if (override) {
+    return override;
+  }
+  return getRequiredEnv(envName);
+}
+
 async function requestJson(url, options = {}) {
   const response = await fetch(url, options);
   const text = await response.text();
@@ -117,13 +125,13 @@ async function loginWithAccessToken(baseUrl, accessToken, username) {
   return json.data;
 }
 
-async function createAuthContext() {
+async function createAuthContext(overrides = {}) {
   loadDotEnv();
 
-  const baseUrl = normalizeBaseUrl(getRequiredEnv("KGD_BASE_URL"));
-  const apiKey = getRequiredEnv("KGD_API_KEY");
-  const apiSecret = getRequiredEnv("KGD_API_SECRET");
-  const username = getRequiredEnv("KGD_USERNAME");
+  const baseUrl = normalizeBaseUrl(getConfigValue("KGD_BASE_URL", overrides.baseUrl));
+  const apiKey = getConfigValue("KGD_API_KEY", overrides.apiKey);
+  const apiSecret = getConfigValue("KGD_API_SECRET", overrides.apiSecret);
+  const username = getConfigValue("KGD_USERNAME", overrides.username);
 
   const accessToken = await getAccessToken(baseUrl, apiKey, apiSecret);
   const loginData = await loginWithAccessToken(baseUrl, accessToken, username);
@@ -142,6 +150,24 @@ async function createAuthContext() {
   };
 }
 
+function buildApiErrorMessage(apiPath, json, fallbackMessage) {
+  const msg = json && json.msg ? json.msg : fallbackMessage;
+  const details = {};
+
+  if (json && Object.prototype.hasOwnProperty.call(json, "code")) {
+    details.code = json.code;
+  }
+  if (json && Object.prototype.hasOwnProperty.call(json, "post_track")) {
+    details.post_track = json.post_track;
+  }
+  if (json && Object.prototype.hasOwnProperty.call(json, "data")) {
+    details.data = json.data;
+  }
+
+  const suffix = Object.keys(details).length ? ` | details=${JSON.stringify(details)}` : "";
+  return `${apiPath} 调用失败: ${msg}${suffix}`;
+}
+
 async function openApiPost(context, apiPath, body = {}) {
   const url = new URL(apiPath, `${context.baseUrl}/`);
   const { json } = await requestJson(url, {
@@ -151,8 +177,34 @@ async function openApiPost(context, apiPath, body = {}) {
   });
 
   if (!json || !json.success) {
-    const msg = json && json.msg ? json.msg : "接口调用失败";
-    throw new Error(`${apiPath} 调用失败: ${msg}`);
+    throw new Error(buildApiErrorMessage(apiPath, json, "接口调用失败"));
+  }
+
+  return json;
+}
+
+async function openApiUploadFile(context, filePath) {
+  if (!fs.existsSync(filePath)) {
+    throw new Error(`找不到文件: ${filePath}`);
+  }
+
+  const formData = new FormData();
+  const fileBuffer = fs.readFileSync(filePath);
+  const fileName = path.basename(filePath);
+  const blob = new Blob([fileBuffer]);
+  formData.append("file", blob, fileName);
+
+  const url = new URL("/open_api/upload/file", `${context.baseUrl}/`);
+  const { json } = await requestJson(url, {
+    method: "POST",
+    headers: {
+      "X-TOKEN": context.loginData.token,
+    },
+    body: formData,
+  });
+
+  if (!json || !json.success) {
+    throw new Error(buildApiErrorMessage("/open_api/upload/file", json, "文件上传失败"));
   }
 
   return json;
@@ -216,12 +268,15 @@ function buildFieldValueList(registry, inputData, objectType) {
 module.exports = {
   buildFieldValueList,
   createAuthContext,
+  getConfigValue,
   getAccessToken,
   getRequiredEnv,
   loadDotEnv,
   loginWithAccessToken,
   normalizeBaseUrl,
   openApiPost,
+  openApiUploadFile,
   readJsonFile,
   requestJson,
+  buildApiErrorMessage,
 };

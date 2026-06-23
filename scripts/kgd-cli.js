@@ -5,6 +5,7 @@ const {
   buildFieldValueList,
   createAuthContext,
   openApiPost,
+  openApiUploadFile,
   readJsonFile,
 } = require("./kgd-common");
 
@@ -41,6 +42,11 @@ function toInt(value, fallback) {
   return Number.isFinite(parsed) ? parsed : fallback;
 }
 
+function toNumber(value, fallback) {
+  const parsed = Number.parseFloat(String(value));
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
 function toBool(value) {
   if (typeof value === "boolean") {
     return value;
@@ -52,12 +58,16 @@ function toBool(value) {
 function printUsage() {
   const lines = [
     "用法:",
+    "  node ./scripts/kgd-cli.js <命令> [--base-url https://api.kgd.ltd] [--api-key xxx] [--api-secret xxx] [--username xxx]",
     "  node ./scripts/kgd-cli.js verify",
     "  node ./scripts/kgd-cli.js token",
     "  node ./scripts/kgd-cli.js build-fields --registry ./config/kgd-field-registry.example.json --input ./your-order.json --object goods",
+    "  node ./scripts/kgd-cli.js openapi:post --path /open_api/pub_craft/list --input ./payload.json [--dry-run]",
+    "  node ./scripts/kgd-cli.js upload:file --file ./demo.png [--dry-run]",
     "  node ./scripts/kgd-cli.js goods:list --keyword 石墨盘 --page 1 --page-size 20",
     "  node ./scripts/kgd-cli.js goods:add --input ./goods.json [--dry-run]",
     "  node ./scripts/kgd-cli.js goods:edit --input ./goods.json [--dry-run]",
+    "  node ./scripts/kgd-cli.js else-stock-in:add --goods-id 8253995 --num 10 --ware-name 成品仓 --stock-type-name 普通入库 --consignee-id 100753 [--bill-date 2026-06-23] [--cost-price 0] [--selling-price 0] [--dry-run]",
     "  node ./scripts/kgd-cli.js user:list --keyword 于英 --page 1 --page-size 20",
     "  node ./scripts/kgd-cli.js produce-bill:list [--keyword 20260305001-4] [--code JGD0001] [--page 1] [--page-size 20]",
     "  node ./scripts/kgd-cli.js produce-bill:status --id 123456 --type 1 [--cancel-reason 原因] [--dry-run]",
@@ -67,6 +77,15 @@ function printUsage() {
     "  node ./scripts/kgd-cli.js contract:list [--keyword 聚力] [--code HT20260623001] [--page 1] [--page-size 20]",
     "  node ./scripts/kgd-cli.js contract:add --input ./contract.json [--dry-run]",
     "  node ./scripts/kgd-cli.js contract:edit --input ./contract.json [--dry-run]",
+    "",
+    "全局鉴权参数:",
+    "  --base-url    临时覆盖 KGD_BASE_URL",
+    "  --api-key     临时覆盖 KGD_API_KEY，通常仅首次部署或切企业时使用",
+    "  --api-secret  临时覆盖 KGD_API_SECRET，通常仅首次部署或切企业时使用",
+    "  --username    临时覆盖 KGD_USERNAME，适合不同对话用户按会话确认",
+    "说明:",
+    "  建议把 KGD_API_KEY/KGD_API_SECRET 作为固定企业配置写入运行环境。",
+    "  不同用户主要确认 KGD_USERNAME；命令行参数优先于 .env，不写入仓库。",
   ];
 
   process.stderr.write(`${lines.join("\n")}\n`);
@@ -89,12 +108,68 @@ function loadJsonInput(args) {
   throw new Error("缺少输入参数：请提供 --input 或 --json");
 }
 
+function normalizeApiPath(apiPath) {
+  const normalized = String(apiPath || "").trim();
+  if (!normalized) {
+    throw new Error("缺少参数：--path");
+  }
+  if (!normalized.startsWith("/open_api/")) {
+    throw new Error("`--path` 必须以 /open_api/ 开头");
+  }
+  return normalized;
+}
+
 function printJson(data) {
   process.stdout.write(`${JSON.stringify(data, null, 2)}\n`);
 }
 
-async function commandVerify() {
-  const context = await createAuthContext();
+function getRequiredFileArg(args) {
+  const fileArg = String(args.file || "").trim();
+  if (!fileArg) {
+    throw new Error("缺少参数：--file");
+  }
+  return path.resolve(process.cwd(), fileArg);
+}
+
+function getRequiredStringArg(args, name, commandName) {
+  const value = String(args[name] || "").trim();
+  if (!value) {
+    throw new Error(`${commandName} 缺少参数：--${name}`);
+  }
+  return value;
+}
+
+function getRequiredPositiveNumberArg(args, name, commandName) {
+  const value = toNumber(args[name], 0);
+  if (!(value > 0)) {
+    throw new Error(`${commandName} 缺少或错误的参数：--${name} 必须大于 0`);
+  }
+  return value;
+}
+
+function getOptionalNumberArg(args, name, fallback) {
+  return args[name] === undefined ? fallback : toNumber(args[name], fallback);
+}
+
+function getTodayDateString() {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, "0");
+  const day = String(now.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function getAuthOverrides(args) {
+  return {
+    baseUrl: args["base-url"],
+    apiKey: args["api-key"],
+    apiSecret: args["api-secret"],
+    username: args.username,
+  };
+}
+
+async function commandVerify(args) {
+  const context = await createAuthContext(getAuthOverrides(args));
   printJson({
     success: true,
     user: {
@@ -105,8 +180,8 @@ async function commandVerify() {
   });
 }
 
-async function commandToken() {
-  const context = await createAuthContext();
+async function commandToken(args) {
+  const context = await createAuthContext(getAuthOverrides(args));
   printJson({
     access_token: context.accessToken,
     x_token: context.loginData.token,
@@ -116,6 +191,41 @@ async function commandToken() {
       real_name: context.loginData.real_name,
     },
   });
+}
+
+async function commandOpenApiPost(args) {
+  const apiPath = normalizeApiPath(args.path);
+  const payload = loadJsonInput(args);
+
+  if (toBool(args["dry-run"])) {
+    printJson({
+      dry_run: true,
+      api: apiPath,
+      payload,
+    });
+    return;
+  }
+
+  const context = await createAuthContext(getAuthOverrides(args));
+  const json = await openApiPost(context, apiPath, payload);
+  printJson(json);
+}
+
+async function commandUploadFile(args) {
+  const filePath = getRequiredFileArg(args);
+
+  if (toBool(args["dry-run"])) {
+    printJson({
+      dry_run: true,
+      api: "/open_api/upload/file",
+      file: filePath,
+    });
+    return;
+  }
+
+  const context = await createAuthContext(getAuthOverrides(args));
+  const json = await openApiUploadFile(context, filePath);
+  printJson(json);
 }
 
 function commandBuildFields(args) {
@@ -130,7 +240,7 @@ function commandBuildFields(args) {
 }
 
 async function commandGoodsList(args) {
-  const context = await createAuthContext();
+  const context = await createAuthContext(getAuthOverrides(args));
   const body = {
     goods_keyword: args.keyword ? String(args.keyword) : "",
     pageNo: toInt(args.page, 1),
@@ -151,14 +261,64 @@ async function commandGoodsWrite(args, mode) {
     return;
   }
 
-  const context = await createAuthContext();
+  const context = await createAuthContext(getAuthOverrides(args));
   const apiPath = mode === "add" ? "/open_api/goods/add" : "/open_api/goods/edit";
   const json = await openApiPost(context, apiPath, payload);
   printJson(json);
 }
 
+async function commandElseStockInAdd(args) {
+  const commandName = "else-stock-in:add";
+  const payload = {
+    bill_date: args["bill-date"] ? String(args["bill-date"]).trim() : getTodayDateString(),
+    ware_name: getRequiredStringArg(args, "ware-name", commandName),
+    stock_type_name: getRequiredStringArg(args, "stock-type-name", commandName),
+    consignee_id: toInt(args["consignee-id"], 0),
+    item_list: [
+      {
+        goods_id: toInt(args["goods-id"], 0),
+        num: getRequiredPositiveNumberArg(args, "num", commandName),
+        cost_price: getOptionalNumberArg(args, "cost-price", 0),
+        selling_price: getOptionalNumberArg(args, "selling-price", 0),
+      },
+    ],
+  };
+
+  if (!payload.consignee_id) {
+    throw new Error(`${commandName} 缺少或错误的参数：--consignee-id 必须为正整数`);
+  }
+  if (!payload.item_list[0].goods_id) {
+    throw new Error(`${commandName} 缺少或错误的参数：--goods-id 必须为正整数`);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.bill_date)) {
+    throw new Error(`${commandName} 参数错误：--bill-date 必须是 YYYY-MM-DD`);
+  }
+  if (args["supplier-id"]) {
+    payload.supplier_id = toInt(args["supplier-id"], 0);
+    if (!payload.supplier_id) {
+      throw new Error(`${commandName} 缺少或错误的参数：--supplier-id 必须为正整数`);
+    }
+  }
+  if (args.remark) {
+    payload.remark = String(args.remark);
+  }
+
+  if (toBool(args["dry-run"])) {
+    printJson({
+      dry_run: true,
+      api: "/open_api/else_stock_in_bill/add",
+      payload,
+    });
+    return;
+  }
+
+  const context = await createAuthContext(getAuthOverrides(args));
+  const json = await openApiPost(context, "/open_api/else_stock_in_bill/add", payload);
+  printJson(json);
+}
+
 async function commandUserList(args) {
-  const context = await createAuthContext();
+  const context = await createAuthContext(getAuthOverrides(args));
   const body = {
     keyword: args.keyword ? String(args.keyword) : "",
     pageNo: toInt(args.page, 1),
@@ -169,7 +329,7 @@ async function commandUserList(args) {
 }
 
 async function commandProduceBillList(args) {
-  const context = await createAuthContext();
+  const context = await createAuthContext(getAuthOverrides(args));
   const body = {
     pageNo: toInt(args.page, 1),
     pageSize: toInt(args["page-size"], 20),
@@ -221,13 +381,13 @@ async function commandProduceBillStatus(args) {
     return;
   }
 
-  const context = await createAuthContext();
+  const context = await createAuthContext(getAuthOverrides(args));
   const json = await openApiPost(context, "/open_api/produce_bill/edit_status", payload);
   printJson(json);
 }
 
 async function commandTaskList(args) {
-  const context = await createAuthContext();
+  const context = await createAuthContext(getAuthOverrides(args));
   const targetProduceBillCode = args["produce-bill-code"] ? String(args["produce-bill-code"]) : "";
   const targetCraftName = args["craft-name"] ? String(args["craft-name"]) : "";
   const targetStatus = args.status ? String(args.status) : "";
@@ -281,13 +441,13 @@ async function commandReportAdd(args) {
     return;
   }
 
-  const context = await createAuthContext();
+  const context = await createAuthContext(getAuthOverrides(args));
   const json = await openApiPost(context, "/open_api/report_work_record/add", payload);
   printJson(json);
 }
 
 async function commandReportList(args) {
-  const context = await createAuthContext();
+  const context = await createAuthContext(getAuthOverrides(args));
   const body = {
     pageNo: toInt(args.page, 1),
     pageSize: toInt(args["page-size"], 20),
@@ -308,7 +468,7 @@ async function commandReportList(args) {
 }
 
 async function commandContractList(args) {
-  const context = await createAuthContext();
+  const context = await createAuthContext(getAuthOverrides(args));
   const body = {
     keyword: args.keyword ? String(args.keyword) : "",
     code: args.code ? String(args.code) : "",
@@ -330,7 +490,7 @@ async function commandContractAdd(args) {
     return;
   }
 
-  const context = await createAuthContext();
+  const context = await createAuthContext(getAuthOverrides(args));
   const json = await openApiPost(context, "/open_api/customer_contract/add", payload);
   printJson(json);
 }
@@ -346,7 +506,7 @@ async function commandContractEdit(args) {
     return;
   }
 
-  const context = await createAuthContext();
+  const context = await createAuthContext(getAuthOverrides(args));
   const json = await openApiPost(context, "/open_api/customer_contract/edit", payload);
   printJson(json);
 }
@@ -362,13 +522,19 @@ async function main() {
 
   switch (command) {
     case "verify":
-      await commandVerify();
+      await commandVerify(args);
       return;
     case "token":
-      await commandToken();
+      await commandToken(args);
       return;
     case "build-fields":
       commandBuildFields(args);
+      return;
+    case "openapi:post":
+      await commandOpenApiPost(args);
+      return;
+    case "upload:file":
+      await commandUploadFile(args);
       return;
     case "goods:list":
       await commandGoodsList(args);
@@ -378,6 +544,9 @@ async function main() {
       return;
     case "goods:edit":
       await commandGoodsWrite(args, "edit");
+      return;
+    case "else-stock-in:add":
+      await commandElseStockInAdd(args);
       return;
     case "user:list":
       await commandUserList(args);

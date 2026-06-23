@@ -21,10 +21,14 @@ description: "对接快工单 OpenAPI（鉴权、基础数据、加工单、报�
   - `api_key`：企业 ApiKey
   - `api_secret`：企业 ApiSecret
   - `username`：用于登录鉴权的用户名
+- 推荐配置方式：
+  - `KGD_API_KEY`、`KGD_API_SECRET` 作为企业级固定配置，首次部署时设置一次
+  - `KGD_USERNAME` 作为会话级配置，不同用户使用时单独确认
 - 默认域名：`https://api.kgd.ltd`
 - 敏感信息保护：
   - 不要把 `api_secret`、`access_token`、`X-TOKEN` 输出到日志或复述给无关方
   - 不要把真实密钥写入仓库；优先使用环境变量、本地 `.env`、密钥管理
+  - 如果用户在对话里临时提供 `api_key`、`api_secret`、`username`，优先作为本次会话的运行时覆盖值使用，不要回写到 `.env.example`、仓库文件或共享脚本中
 
 建议环境变量：
 
@@ -391,6 +395,35 @@ node ./scripts/kgd-verify.js
 
 ```bash
 node ./scripts/kgd-cli.js verify
+```
+
+- 多用户场景可直接临时覆盖鉴权参数，不依赖共享 `.env`：
+
+```bash
+node ./scripts/kgd-cli.js verify \
+  --username YOUR_USERNAME
+```
+
+- 建议使用方式：
+  - `KGD_API_KEY`、`KGD_API_SECRET` 固定放在运行环境
+  - `KGD_USERNAME` 按当前对话用户确认，必要时通过 `--username` 临时覆盖
+- 全局参数优先于 `.env`：
+  - `--base-url`
+  - `--api-key`
+  - `--api-secret`
+  - `--username`
+
+- 调用任意已知 OpenAPI：
+
+```bash
+node ./scripts/kgd-cli.js openapi:post --path /open_api/pub_craft/list --input ./payload.json --dry-run
+```
+
+- 上传附件：
+
+```bash
+node ./scripts/kgd-cli.js upload:file --file ./demo.png --dry-run
+node ./scripts/kgd-cli.js upload:file --file ./demo.png
 ```
 
 - 获取最新 token：
