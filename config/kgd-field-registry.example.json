@@ -1,0 +1,98 @@
+{
+  "version": 1,
+  "objects": {
+    "goods": [
+      {
+        "name": "物料编码",
+        "sourceKey": "material_code",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "用料",
+        "sourceKey": "usage",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "HT图号",
+        "sourceKey": "ht_drawing_no",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "图纸编码",
+        "sourceKey": "drawing_code",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "版本号",
+        "sourceKey": "revision",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "是否涂层",
+        "sourceKey": "coating",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "contract_header": [
+      {
+        "name": "客户代码",
+        "sourceKey": "customer_code",
+        "type": "string",
+        "required": false
+      }
+    ],
+    "contract_item": [
+      {
+        "name": "物料编码",
+        "sourceKey": "material_code",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "用料",
+        "sourceKey": "usage",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "HT图号",
+        "sourceKey": "ht_drawing_no",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "图纸编码",
+        "sourceKey": "drawing_code",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "版本号",
+        "sourceKey": "revision",
+        "type": "string",
+        "required": false
+      },
+      {
+        "name": "是否涂层",
+        "sourceKey": "coating",
+        "type": "string",
+        "required": false
+      }
+    ]
+  },
+  "exampleInput": {
+    "customer_code": "G012",
+    "material_code": "TWI0",
+    "usage": "-5",
+    "ht_drawing_no": "G012-20260615",
+    "drawing_code": "V970B1",
+    "revision": "",
+    "coating": "无镀层"
+  }
+}
