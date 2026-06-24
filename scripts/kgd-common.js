@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
+const crypto = require("crypto");
 const fs = require("fs");
 const path = require("path");
+
+const AUTH_CACHE_FILE_NAME = ".kgd-auth-cache.json";
+const ACCESS_TOKEN_TTL_MS = 110 * 60 * 1000;
 
 function loadDotEnv(envPath = path.resolve(process.cwd(), ".env")) {
   if (!fs.existsSync(envPath)) {
@@ -74,6 +78,104 @@ function normalizeBaseUrl(baseUrl) {
   return String(baseUrl).replace(/\/+$/, "");
 }
 
+function getAuthCacheFilePath() {
+  return path.resolve(process.cwd(), AUTH_CACHE_FILE_NAME);
+}
+
+function getAuthCacheKey(baseUrl, apiKey, apiSecret, username) {
+  return crypto
+    .createHash("sha256")
+    .update([baseUrl, apiKey, apiSecret, username].join("|"))
+    .digest("hex");
+}
+
+function readAuthCache() {
+  const filePath = getAuthCacheFilePath();
+  if (!fs.existsSync(filePath)) {
+    return {
+      entries: {},
+    };
+  }
+
+  try {
+    const json = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    if (!json || typeof json !== "object" || typeof json.entries !== "object" || !json.entries) {
+      return {
+        entries: {},
+      };
+    }
+    return json;
+  } catch (error) {
+    return {
+      entries: {},
+    };
+  }
+}
+
+function writeAuthCache(cacheData) {
+  const filePath = getAuthCacheFilePath();
+  fs.writeFileSync(filePath, JSON.stringify(cacheData, null, 2), "utf8");
+}
+
+function getCachedAuthEntry(cacheKey) {
+  const cacheData = readAuthCache();
+  const entry = cacheData.entries[cacheKey];
+  if (!entry || typeof entry !== "object") {
+    return null;
+  }
+
+  if (!entry.expires_at || Date.now() >= Number(entry.expires_at)) {
+    delete cacheData.entries[cacheKey];
+    writeAuthCache(cacheData);
+    return null;
+  }
+
+  if (!entry.access_token || !entry.login_data || !entry.login_data.token) {
+    delete cacheData.entries[cacheKey];
+    writeAuthCache(cacheData);
+    return null;
+  }
+
+  return entry;
+}
+
+function saveAuthCacheEntry(cacheKey, accessToken, loginData) {
+  const cacheData = readAuthCache();
+  cacheData.entries[cacheKey] = {
+    access_token: accessToken,
+    login_data: loginData,
+    cached_at: Date.now(),
+    expires_at: Date.now() + ACCESS_TOKEN_TTL_MS,
+  };
+  writeAuthCache(cacheData);
+}
+
+function removeAuthCacheEntry(cacheKey) {
+  const cacheData = readAuthCache();
+  if (!cacheData.entries[cacheKey]) {
+    return;
+  }
+  delete cacheData.entries[cacheKey];
+  writeAuthCache(cacheData);
+}
+
+function buildAuthContext(baseUrl, apiKey, apiSecret, username, overrides, accessToken, loginData, cacheKey) {
+  return {
+    baseUrl,
+    apiKey,
+    apiSecret,
+    username,
+    overrides,
+    accessToken,
+    loginData,
+    cacheKey,
+    headers: {
+      "Content-Type": "application/json",
+      "X-TOKEN": loginData.token,
+    },
+  };
+}
+
 async function getAccessToken(baseUrl, apiKey, apiSecret) {
   const url = new URL("/open_api/token", baseUrl);
   url.searchParams.set("api_key", apiKey);
@@ -125,30 +227,36 @@ async function loginWithAccessToken(baseUrl, accessToken, username) {
   return json.data;
 }
 
-async function createAuthContext(overrides = {}) {
+async function createAuthContext(overrides = {}, options = {}) {
   loadDotEnv();
 
   const baseUrl = normalizeBaseUrl(getConfigValue("KGD_BASE_URL", overrides.baseUrl));
   const apiKey = getConfigValue("KGD_API_KEY", overrides.apiKey);
   const apiSecret = getConfigValue("KGD_API_SECRET", overrides.apiSecret);
   const username = getConfigValue("KGD_USERNAME", overrides.username);
+  const cacheKey = getAuthCacheKey(baseUrl, apiKey, apiSecret, username);
+
+  if (!options.forceRefresh) {
+    const cachedEntry = getCachedAuthEntry(cacheKey);
+    if (cachedEntry) {
+      return buildAuthContext(
+        baseUrl,
+        apiKey,
+        apiSecret,
+        username,
+        overrides,
+        cachedEntry.access_token,
+        cachedEntry.login_data,
+        cacheKey
+      );
+    }
+  }
 
   const accessToken = await getAccessToken(baseUrl, apiKey, apiSecret);
   const loginData = await loginWithAccessToken(baseUrl, accessToken, username);
+  saveAuthCacheEntry(cacheKey, accessToken, loginData);
 
-  return {
-    baseUrl,
-    apiKey,
-    apiSecret,
-    username,
-    overrides,
-    accessToken,
-    loginData,
-    headers: {
-      "Content-Type": "application/json",
-      "X-TOKEN": loginData.token,
-    },
-  };
+  return buildAuthContext(baseUrl, apiKey, apiSecret, username, overrides, accessToken, loginData, cacheKey);
 }
 
 function buildApiErrorMessage(apiPath, json, fallbackMessage) {
@@ -184,7 +292,13 @@ function isAuthFailure(json) {
 }
 
 async function recreateAuthContext(context) {
-  return createAuthContext(context && context.overrides ? context.overrides : {});
+  const overrides = context && context.overrides ? context.overrides : {};
+  if (context && context.cacheKey) {
+    removeAuthCacheEntry(context.cacheKey);
+  }
+  return createAuthContext(overrides, {
+    forceRefresh: true,
+  });
 }
 
 async function openApiPost(context, apiPath, body = {}) {
