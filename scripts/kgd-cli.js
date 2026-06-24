@@ -1168,17 +1168,23 @@ async function commandTaskList(args) {
   const targetProduceBillCode = args["produce-bill-code"] ? String(args["produce-bill-code"]) : "";
   const targetCraftName = args["craft-name"] ? String(args["craft-name"]) : "";
   const targetStatus = args.status ? String(args.status) : "";
-  const fetchAll = toBool(args.all);
+  const fetchAll = toBool(args.all) || (targetProduceBillCode && (targetCraftName || targetStatus));
   const pageSize = toInt(args["page-size"], 200);
 
   const allRows = [];
   let pageNo = toInt(args.page, 1);
 
   while (true) {
-    const json = await openApiPost(context, "/open_api/produce_bill_craft/list", {
+    const requestBody = {
       pageNo,
       pageSize,
-    });
+    };
+
+    if (targetProduceBillCode) {
+      requestBody.produce_bill_code = targetProduceBillCode;
+    }
+
+    const json = await openApiPost(context, "/open_api/produce_bill_craft/list", requestBody);
     const rows = Array.isArray(json.data) ? json.data : [];
     if (!rows.length) {
       break;
