@@ -32,6 +32,192 @@
 - `KGD_API_KEY`、`KGD_API_SECRET` 作为企业固定配置
 - `KGD_USERNAME` 作为当前会话用户配置
 
+## 当前 CLI 能力地图
+
+当前仓库里的 CLI 入口文件是 `scripts/kgd-cli.js`。
+
+它的定位不是完整 SDK，而是：
+
+- 高频业务提供专用命令
+- 复杂或低频接口通过 `openapi:post` 补位
+- 所有业务命令复用统一鉴权、错误处理和 `dry-run`
+
+### 平台与基础能力
+
+- `verify`
+  - 校验当前环境变量和登录流程是否可用
+- `auth:test`
+  - 显式测试当前用户是否能成功鉴权
+- `token`
+  - 获取当前会话 token
+  - 默认不输出敏感值，需显式传 `--show-secrets`
+- `build-fields`
+  - 根据字段注册表生成 `fieldValueList`
+- `openapi:post`
+  - 通用 OpenAPI POST 调用器
+  - 当某个业务还没封装成专用命令时，用它兜底
+- `upload:file`
+  - 上传附件文件到快工单
+
+### 鉴权与运行规则
+
+- 支持从 `.env` 读取：
+  - `KGD_BASE_URL`
+  - `KGD_API_KEY`
+  - `KGD_API_SECRET`
+  - `KGD_USERNAME`
+- 支持命令行临时覆盖：
+  - `--base-url`
+  - `--api-key`
+  - `--api-secret`
+  - `--username`
+- 统一鉴权流程：
+  - 先获取 `access_token`
+  - 再登录换取 `X-TOKEN`
+- 鉴权失败时会自动重试一次
+- 大部分写操作支持 `--dry-run`
+
+### 主数据能力
+
+- 商品
+  - `goods:list`
+  - `goods:add`
+  - `goods:edit`
+  - `goods:disable`
+- 工序
+  - `pub-craft:list`
+  - `pub-craft:add`
+  - `pub-craft:edit`
+- 客户
+  - `customer:list`
+  - `customer:add`
+- 供应商
+  - `supplier:list`
+  - `supplier:add`
+- 用户
+  - `user:list`
+
+其中：
+
+- `customer:add`
+  - 支持参数模式直接创建
+- `supplier:add`
+  - 支持参数模式直接创建
+- `goods:disable`
+  - 本质上是对商品编辑接口做“停用包装”
+- `pub-craft:add`
+  - 支持参数模式和 JSON 模式
+- `pub-craft:edit`
+  - 支持参数模式和 JSON 模式
+- `pub-craft:list`
+  - 支持按关键字分页查询工序
+
+### 生产业务能力
+
+- 加工单
+  - `produce-bill:list`
+  - `produce-bill:add`
+  - `produce-bill:status`
+- 成品入库
+  - `produce-stock-in:list`
+  - `produce-stock-in:add`
+- 生产任务
+  - `task:list`
+  - `task:status`
+- 报工
+  - `report:list`
+  - `report:add`
+  - `report:edit`
+
+其中：
+
+- `produce-bill:add`
+  - 支持参数模式和 JSON 模式
+- `produce-bill:status`
+  - 支持开始、撤回、完成、取消
+- `produce-stock-in:add`
+  - 支持参数模式和 JSON 模式
+- `produce-stock-in:list`
+  - 支持按关键字分页查询成品入库单
+- `task:list`
+  - 会分页抓取生产任务后再做本地过滤
+- `report:edit`
+  - 支持参数模式
+- `report:add`
+  - 当前主要走 JSON 模式，适合复杂报工结构
+
+### 库存与出入库能力
+
+- 其他出库单
+  - `else-stock-out:list`
+  - `else-stock-out:add`
+- 其他入库单
+  - `else-stock-in:list`
+  - `else-stock-in:add`
+
+其中：
+
+- `else-stock-out:list`
+  - 支持按关键字分页查询其他出库单
+- `else-stock-out:add`
+  - 支持参数模式和 JSON 模式
+  - 支持商品、数量、仓库、出库类型、发货人、备注等参数
+- `else-stock-in:add`
+  - 是当前最完整的业务专用命令之一
+  - 支持商品、数量、仓库、入库类型、收货人、供应商、单价等参数
+  - 支持 `--dry-run`
+- `else-stock-in:list`
+  - 支持按关键字分页查询其他入库单
+
+### 合同能力
+
+- `contract:list`
+- `contract:add`
+- `contract:edit`
+
+其中：
+
+- `contract:add`
+  - 支持 JSON 模式
+  - 也支持参数模式，不用手写完整 JSON
+  - 会自动补齐常见隐藏字段和默认金额字段
+- `contract:edit`
+  - 当前主要走 JSON 模式
+
+### 输入方式地图
+
+当前 CLI 主要支持 4 种输入方式：
+
+- 参数模式
+  - 适合高频、固定结构业务
+  - 例如 `pub-craft:add`、`pub-craft:edit`、`customer:add`、`supplier:add`、`else-stock-out:add`、`else-stock-in:add`、`produce-bill:add`、`produce-stock-in:add`、`report:edit`、`contract:add`
+- `--input`
+  - 从本地 JSON 文件读取 payload
+- `--json`
+  - 直接内联 JSON
+- `openapi:post`
+  - 用于未单独封装的接口
+
+### 当前能力边界
+
+当前 CLI 已经适合处理这些高频工作：
+
+- 查用户、商品、客户、供应商
+- 查工序、其他出库单、其他入库单、成品入库单
+- 新建和维护商品、客户、供应商
+- 新建和维护工序
+- 建加工单、查任务、改任务状态
+- 建其他出库单、其他入库单、成品入库单
+- 新增和编辑报工
+- 查询、新建、编辑合同
+- 上传附件
+
+当前仍建议继续补充的专用命令包括：
+
+- `contract:edit` 参数模式
+- `report:add` 参数模式
+- 更多列表筛选和详情命令
+
 ## 在 OpenClaw 中怎么用
 
 你可以直接对 OpenClaw 说业务话术，不需要自己拼 OpenAPI 请求。
@@ -176,6 +362,38 @@ OpenClaw 应先判断：
 
 如果不是基于加工单入库，优先按 `其他入库单` 流程继续追问。
 
+### 创建合同
+
+```text
+帮我给平板石墨盘创建合同订单
+```
+
+建议至少确认：
+
+- 客户
+- 商品
+- 数量
+- 单价
+- 合同总金额
+- 预付款
+- 是否含税
+- 交期
+- 业务员
+
+当前项目里的 `contract:add` 已补充一层常用兼容处理：
+
+- 自动补齐 `enterprise_id`
+- `fieldValueList` 默认补 `[]`
+- `item_list[].money` 可按 `num * unit_price` 自动计算
+- `item_list[].discount` 默认补 `"10"`
+- `item_list[].discount_money` 默认补 `"0"`
+- `item_list[].after_discount_money` 默认按金额自动计算
+
+现在支持两种调用方式：
+
+- `--input` / `--json` 传完整 payload
+- 直接传参数创建，不用手写 JSON
+
 ## 可直接配合脚本使用
 
 如果 OpenClaw 需要在本地脚本层执行，也可以直接调用仓库里的 CLI：
@@ -186,6 +404,20 @@ node ./scripts/kgd-cli.js verify
 
 ```bash
 node ./scripts/kgd-cli.js goods:list --keyword 石墨盘 --page 1 --page-size 20
+```
+
+```bash
+node ./scripts/kgd-cli.js pub-craft:list --keyword 打磨 --page 1 --page-size 20
+```
+
+```bash
+node ./scripts/kgd-cli.js pub-craft:add \
+  --name 打磨 \
+  --code GM001 \
+  --need-quality 1 \
+  --price-mode 1 \
+  --workshop-name 包装车间 \
+  --produce-line-name 石墨板加工产线
 ```
 
 ```bash
@@ -207,6 +439,56 @@ node ./scripts/kgd-cli.js else-stock-in:add \
   --cost-price 0 \
   --selling-price 0
 ```
+
+```bash
+node ./scripts/kgd-cli.js else-stock-out:add \
+  --goods-id 8253995 \
+  --num 2 \
+  --ware-name 成品仓 \
+  --stock-type-name 普通出库 \
+  --shipper-id 100753 \
+  --remark 样品寄出
+```
+
+```bash
+node ./scripts/kgd-cli.js produce-stock-in:add \
+  --produce-bill-id 123456 \
+  --num 10 \
+  --ware-name 成品仓 \
+  --stock-type-name 完工入库 \
+  --remark 平板石墨盘完工入库
+```
+
+```bash
+node ./scripts/kgd-cli.js contract:add \
+  --customer-id 1544650 \
+  --linkman-id 1747835 \
+  --sales-user-id 144246 \
+  --goods-id 8253995 \
+  --num 10 \
+  --unit-price 100 \
+  --money 1000 \
+  --advance 300 \
+  --delivery-date 2026-06-30 \
+  --has-tax 1 \
+  --code HT20260624001 \
+  --remark 平板石墨盘合同订单
+```
+
+参数模式下常用字段：
+
+- `--customer-id`
+- `--linkman-id`
+- `--sales-user-id`
+- `--goods-id`
+- `--num`
+- `--unit-price`
+- `--money`
+- `--advance`
+- `--delivery-date`
+- `--has-tax`
+- `--code`
+- `--remark`
 
 ## 参考资料
 

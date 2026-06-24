@@ -73,6 +73,7 @@ curl --location "${KGD_BASE_URL}/open_api/user/login" \
   - 先重新获取 `access_token`
   - 再重新登录拿新的 `X-TOKEN`
   - 然后重试原请求一次
+  - 当前项目中的 Node.js CLI 已内置这一行为
 
 ## 能力总览
 
@@ -397,6 +398,12 @@ node ./scripts/kgd-verify.js
 node ./scripts/kgd-cli.js verify
 ```
 
+- 安全验证当前会话用户：
+
+```bash
+node ./scripts/kgd-cli.js auth:test --username YOUR_USERNAME
+```
+
 - 多用户场景可直接临时覆盖鉴权参数，不依赖共享 `.env`：
 
 ```bash
@@ -426,16 +433,59 @@ node ./scripts/kgd-cli.js upload:file --file ./demo.png --dry-run
 node ./scripts/kgd-cli.js upload:file --file ./demo.png
 ```
 
+- 查询其他出库单：
+
+```bash
+node ./scripts/kgd-cli.js else-stock-out:list --keyword 石墨盘 --page 1 --page-size 20
+```
+
+- 新增其他出库单：
+
+```bash
+node ./scripts/kgd-cli.js else-stock-out:add --goods-id 8253995 --num 10 --ware-name 成品仓 --stock-type-name 普通出库 --shipper-id 100753 --dry-run
+```
+
+- 查询其他入库单：
+
+```bash
+node ./scripts/kgd-cli.js else-stock-in:list --keyword 石墨盘 --page 1 --page-size 20
+```
+
 - 获取最新 token：
 
 ```bash
 node ./scripts/kgd-cli.js token
 ```
 
+- `token` 命令默认不输出真实 `access_token` / `X-TOKEN`
+- 如确需人工排查并查看敏感令牌，必须显式开启：
+
+```bash
+node ./scripts/kgd-cli.js token --show-secrets
+```
+
 - 查询商品：
 
 ```bash
 node ./scripts/kgd-cli.js goods:list --keyword 石墨盘 --page 1 --page-size 20
+```
+
+- 查询工序：
+
+```bash
+node ./scripts/kgd-cli.js pub-craft:list --keyword 打磨 --page 1 --page-size 20
+```
+
+- 新增工序：
+
+```bash
+node ./scripts/kgd-cli.js pub-craft:add --name 打磨 --code GM001 --reportable-user-ids-json '[1001,1002]' --dry-run
+```
+
+- 编辑工序：
+
+```bash
+node ./scripts/kgd-cli.js pub-craft:edit --id 123456 --name 打磨 --code GM001 --dry-run
 ```
 
 - 新增商品：
@@ -450,16 +500,52 @@ node ./scripts/kgd-cli.js goods:add --input ./goods.json
 node ./scripts/kgd-cli.js goods:edit --input ./goods.json
 ```
 
+- 停用商品：
+
+```bash
+node ./scripts/kgd-cli.js goods:disable --id 8254248 --name 石墨盘 --remark 误建停用 --dry-run
+```
+
 - 查询用户：
 
 ```bash
 node ./scripts/kgd-cli.js user:list --keyword 于英 --page 1 --page-size 20
 ```
 
+- 查询客户：
+
+```bash
+node ./scripts/kgd-cli.js customer:list --keyword 聚力 --page 1 --page-size 20
+```
+
+- 新增客户：
+
+```bash
+node ./scripts/kgd-cli.js customer:add --name 聚力 --linkman-name 张三 --mobile 13800000000 --dry-run
+```
+
+- 查询供应商：
+
+```bash
+node ./scripts/kgd-cli.js supplier:list --keyword 碳材 --page 1 --page-size 20
+```
+
+- 新增供应商：
+
+```bash
+node ./scripts/kgd-cli.js supplier:add --name 某供应商 --linkman-name 李四 --linkman-mobile 13800000000 --dry-run
+```
+
 - 查询加工单：
 
 ```bash
 node ./scripts/kgd-cli.js produce-bill:list --keyword 20260305001-4 --page 1 --page-size 20
+```
+
+- 新增加工单：
+
+```bash
+node ./scripts/kgd-cli.js produce-bill:add --goods-id 8253995 --num 10 --delivery-date 2026-06-30 --craft-list-json '["打磨","打码"]' --dry-run
 ```
 
 - 流转加工单状态：
@@ -474,16 +560,40 @@ node ./scripts/kgd-cli.js produce-bill:status --id 123456 --type 1 --dry-run
 node ./scripts/kgd-cli.js produce-bill:status --id 123456 --type 4 --cancel-reason 客户取消
 ```
 
+- 查询成品入库单：
+
+```bash
+node ./scripts/kgd-cli.js produce-stock-in:list --keyword JGD0001 --page 1 --page-size 20
+```
+
+- 新增成品入库单：
+
+```bash
+node ./scripts/kgd-cli.js produce-stock-in:add --produce-bill-id 123456 --num 10 --ware-name 成品仓 --stock-type-name 完工入库 --dry-run
+```
+
 - 查询生产任务：
 
 ```bash
 node ./scripts/kgd-cli.js task:list --produce-bill-code 20260305001-4 --craft-name 打磨 --all
 ```
 
+- 流转生产任务状态：
+
+```bash
+node ./scripts/kgd-cli.js task:status --id 23437544 --status 3 --dry-run
+```
+
 - 查询报工记录：
 
 ```bash
 node ./scripts/kgd-cli.js report:list --produce-craft-id 23437544 --page 1 --page-size 20
+```
+
+- 编辑报工记录：
+
+```bash
+node ./scripts/kgd-cli.js report:edit --id 123456 --report-user-id 100753 --valid-num 10 --waste-num 0 --dry-run
 ```
 
 - 查询合同：

@@ -141,6 +141,7 @@ async function createAuthContext(overrides = {}) {
     apiKey,
     apiSecret,
     username,
+    overrides,
     accessToken,
     loginData,
     headers: {
@@ -168,19 +169,48 @@ function buildApiErrorMessage(apiPath, json, fallbackMessage) {
   return `${apiPath} 调用失败: ${msg}${suffix}`;
 }
 
+function isAuthFailure(json) {
+  const code = json && Object.prototype.hasOwnProperty.call(json, "code") ? String(json.code) : "";
+  const msg = json && Object.prototype.hasOwnProperty.call(json, "msg") ? String(json.msg) : "";
+  const normalizedMsg = msg.toLowerCase();
+
+  return (
+    code === "401" ||
+    normalizedMsg.includes("token") ||
+    normalizedMsg.includes("登录") ||
+    normalizedMsg.includes("鉴权") ||
+    normalizedMsg.includes("认证")
+  );
+}
+
+async function recreateAuthContext(context) {
+  return createAuthContext(context && context.overrides ? context.overrides : {});
+}
+
 async function openApiPost(context, apiPath, body = {}) {
   const url = new URL(apiPath, `${context.baseUrl}/`);
-  const { json } = await requestJson(url, {
-    method: "POST",
-    headers: context.headers,
-    body: JSON.stringify(body),
-  });
+  let activeContext = context;
 
-  if (!json || !json.success) {
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const { json } = await requestJson(url, {
+      method: "POST",
+      headers: activeContext.headers,
+      body: JSON.stringify(body),
+    });
+
+    if (json && json.success) {
+      return json;
+    }
+
+    if (attempt === 0 && isAuthFailure(json)) {
+      activeContext = await recreateAuthContext(activeContext);
+      continue;
+    }
+
     throw new Error(buildApiErrorMessage(apiPath, json, "接口调用失败"));
   }
 
-  return json;
+  throw new Error(buildApiErrorMessage(apiPath, null, "接口调用失败"));
 }
 
 async function openApiUploadFile(context, filePath) {
@@ -188,26 +218,37 @@ async function openApiUploadFile(context, filePath) {
     throw new Error(`找不到文件: ${filePath}`);
   }
 
-  const formData = new FormData();
+  const url = new URL("/open_api/upload/file", `${context.baseUrl}/`);
   const fileBuffer = fs.readFileSync(filePath);
   const fileName = path.basename(filePath);
-  const blob = new Blob([fileBuffer]);
-  formData.append("file", blob, fileName);
+  let activeContext = context;
 
-  const url = new URL("/open_api/upload/file", `${context.baseUrl}/`);
-  const { json } = await requestJson(url, {
-    method: "POST",
-    headers: {
-      "X-TOKEN": context.loginData.token,
-    },
-    body: formData,
-  });
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const formData = new FormData();
+    const blob = new Blob([fileBuffer]);
+    formData.append("file", blob, fileName);
 
-  if (!json || !json.success) {
+    const { json } = await requestJson(url, {
+      method: "POST",
+      headers: {
+        "X-TOKEN": activeContext.loginData.token,
+      },
+      body: formData,
+    });
+
+    if (json && json.success) {
+      return json;
+    }
+
+    if (attempt === 0 && isAuthFailure(json)) {
+      activeContext = await recreateAuthContext(activeContext);
+      continue;
+    }
+
     throw new Error(buildApiErrorMessage("/open_api/upload/file", json, "文件上传失败"));
   }
 
-  return json;
+  throw new Error(buildApiErrorMessage("/open_api/upload/file", null, "文件上传失败"));
 }
 
 function readJsonFile(filePath) {
@@ -279,4 +320,5 @@ module.exports = {
   readJsonFile,
   requestJson,
   buildApiErrorMessage,
+  isAuthFailure,
 };
