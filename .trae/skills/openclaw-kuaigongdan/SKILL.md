@@ -15,6 +15,13 @@ description: "对接快工单 OpenAPI（鉴权、基础数据、加工单、报�
 - 用户要求“上传附件，并挂到商品、加工单、报工、合同等附件字段”
 - 用户已提供快工单账号配置，希望由你直接调用 OpenAPI 完成业务动作
 
+## Skill 边界
+
+- 当目标是“调用快工单业务接口并返回结果”时，继续使用本 Skill
+- 当目标是“重构 `scripts/kgd-cli.js`、拆分命令模块、把 `switch` 改成注册表、整理 `dry-run` 回归流程”时，不要继续使用本 Skill
+- 遇到 CLI 结构改造、模块化、命令注册表、重构评审或重构回归，应切换到工作区 Skill `kgd-cli-refactor`
+- 如果用户同时提出“先改 CLI 再用 CLI 执行业务命令”，应先用 `kgd-cli-refactor` 完成结构改造，再回到本 Skill 执行业务操作
+
 ## 前置配置
 
 - 需要以下输入：
@@ -267,6 +274,10 @@ curl --location "${KGD_BASE_URL}/open_api/user/login" \
 - 常用：`code`, `linkman_id`, `delivery_date`, `remark`, `address`, `province_code`, `city_code`, `area_code`, `fieldValueList`, `attachments`
 - `item_list` 元素常用字段：
   - `goods_id`, `num`, `unit_price`, `money`, `discount`, `discount_money`, `after_discount_money`, `remark`
+- **重要实测发现**：
+  - 合同头级 `remark` **必须有值**，否则快工单 API 会返回"参数校验错误"
+  - 合同头级 `code` 不是硬性必填；缺失时系统可自动生成合同编号
+  - 明细 `remark` 建议填写；若未提供，当前 CLI 应优先用合同头 `remark` 回填，降低接口校验失败风险
 - 当前项目 CLI 的合同新增补充能力：
   - 参数模式下 `--has-tax` 接受 `1/0/2/是/否`；其中 `0` 和 `2` 都按“不含税”处理
   - `--input/--json` 模式下若未显式传 `enterprise_id`，CLI 会优先从当前登录上下文中推断并补齐
@@ -327,7 +338,8 @@ curl --location "${KGD_BASE_URL}/open_api/upload/file" \
 - 用户想“新增出入库单”：
   - 至少确认日期、仓库、明细 `item_list`
 - 用户想“新增合同”：
-  - 至少确认 `enterprise_id`, `customer_id`, `money`, `advance`, `has_tax`, `sales_user_id`
+  - 至少确认 `enterprise_id`, `customer_id`, `money`, `advance`, `has_tax`, `sales_user_id`, `remark`
+  - `code` 可选；不传可由系统生成
 
 ### 对字段不全的处理原则
 
@@ -351,7 +363,34 @@ curl --location "${KGD_BASE_URL}/open_api/upload/file" \
 - 字段注册表：`config/kgd-field-registry.example.json`
 - 构造脚本：`scripts/kgd-build-field-value-list.js`
 - 鉴权验证脚本：`scripts/kgd-verify.js`
-- 命令行工具：`scripts/kgd-cli.js`
+- 命令行统一入口：`scripts/kgd-cli.js`
+
+### 当前 CLI 实现结构
+
+- `scripts/kgd-cli.js`
+  - 统一入口，负责参数解析、帮助输出、模块装配和命令调度
+- `scripts/commands/registry.js`
+  - 统一维护命令注册和 `usage` 文本
+- `scripts/commands/factories.js`
+  - 维护列表命令和写命令的通用工厂
+- `scripts/commands/list.js`
+  - 列表类命令，以及 `task:list` 的特殊分页抓取和本地过滤
+- `scripts/commands/write.js`
+  - 低风险写命令
+- `scripts/commands/goods.js`
+  - 商品命令，以及 `goods:edit` 的自动补全兼容逻辑
+- `scripts/commands/warehouse.js`
+  - 其他出入库、成品入库和仓库单据归一化逻辑
+- `scripts/commands/status.js`
+  - 加工单与任务状态流转命令
+- `scripts/commands/contract.js`
+  - `contract:add` 及其金额、税务、`enterprise_id` 归一化逻辑
+
+后续如果扩展 CLI：
+
+- 命令注册和帮助文本以 `scripts/commands/registry.js` 为准
+- 通用抽象优先补在 `scripts/commands/factories.js`
+- 特殊兼容逻辑不要为追求统一而抹平
 
 ### 示例字段映射
 

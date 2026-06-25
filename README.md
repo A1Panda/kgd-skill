@@ -15,8 +15,16 @@
 ## Skill 名称
 
 - `openclaw-kuaigongdan`
+- `kgd-cli-refactor`
 
-当你在 OpenClaw 中让助手操作快工单相关数据时，应该优先使用这个 Skill。
+当你在 OpenClaw 中让助手操作快工单相关数据时，应该优先使用 `openclaw-kuaigongdan`。
+
+当你要做以下事情时，应该切换到 `kgd-cli-refactor`：
+
+- 重构 `scripts/kgd-cli.js`
+- 把大 `switch` 改成命令注册表
+- 拆分 `scripts/commands/` 模块
+- 为 CLI 重构补回归检查和维护规范
 
 ## 前置配置
 
@@ -34,13 +42,42 @@
 
 ## 当前 CLI 能力地图
 
-当前仓库里的 CLI 入口文件是 `scripts/kgd-cli.js`。
+当前仓库里的 CLI 统一入口文件是 `scripts/kgd-cli.js`。
 
 它的定位不是完整 SDK，而是：
 
 - 高频业务提供专用命令
 - 复杂或低频接口通过 `openapi:post` 补位
 - 所有业务命令复用统一鉴权、错误处理和 `dry-run`
+
+### 当前代码结构
+
+当前 CLI 已完成模块化拆分，主要结构如下：
+
+- `scripts/kgd-cli.js`
+  - 负责参数解析、帮助输出、模块装配和命令调度
+- `scripts/commands/registry.js`
+  - 统一维护命令注册和 `usage` 元数据
+- `scripts/commands/factories.js`
+  - 提供列表命令和写命令的通用工厂
+- `scripts/commands/list.js`
+  - 承载列表类命令与 `task:list` 的特殊分页过滤逻辑
+- `scripts/commands/write.js`
+  - 承载低风险写命令
+- `scripts/commands/goods.js`
+  - 承载商品相关命令和 `goods:edit` 自动补全逻辑
+- `scripts/commands/warehouse.js`
+  - 承载其他出入库、成品入库和仓库单据归一化逻辑
+- `scripts/commands/status.js`
+  - 承载加工单与任务状态命令
+- `scripts/commands/contract.js`
+  - 承载 `contract:add` 及其金额、税务、企业信息归一化逻辑
+
+后续新增命令时，建议同时更新：
+
+- `scripts/commands/registry.js`
+- 对应的 `scripts/commands/*.js` 模块
+- `README.md` / `.trae/skills/openclaw-kuaigongdan/SKILL.md` 中的能力说明
 
 ### 平台与基础能力
 
