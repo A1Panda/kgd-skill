@@ -15,6 +15,13 @@ description: "对接快工单 OpenAPI（鉴权、基础数据、加工单、报�
 - 用户要求“上传附件，并挂到商品、加工单、报工、合同等附件字段”
 - 用户已提供快工单账号配置，希望由你直接调用 OpenAPI 完成业务动作
 
+## Skill 边界
+
+- 当目标是“调用快工单业务接口并返回结果”时，继续使用本 Skill
+- 当目标是“重构 `scripts/kgd-cli.js`、拆分命令模块、把 `switch` 改成注册表、整理 `dry-run` 回归流程”时，不要继续使用本 Skill
+- 遇到 CLI 结构改造、模块化、命令注册表、重构评审或重构回归，应切换到工作区 Skill `kgd-cli-refactor`
+- 如果用户同时提出“先改 CLI 再用 CLI 执行业务命令”，应先用 `kgd-cli-refactor` 完成结构改造，再回到本 Skill 执行业务操作
+
 ## 前置配置
 
 - 需要以下输入：
@@ -351,7 +358,34 @@ curl --location "${KGD_BASE_URL}/open_api/upload/file" \
 - 字段注册表：`config/kgd-field-registry.example.json`
 - 构造脚本：`scripts/kgd-build-field-value-list.js`
 - 鉴权验证脚本：`scripts/kgd-verify.js`
-- 命令行工具：`scripts/kgd-cli.js`
+- 命令行统一入口：`scripts/kgd-cli.js`
+
+### 当前 CLI 实现结构
+
+- `scripts/kgd-cli.js`
+  - 统一入口，负责参数解析、帮助输出、模块装配和命令调度
+- `scripts/commands/registry.js`
+  - 统一维护命令注册和 `usage` 文本
+- `scripts/commands/factories.js`
+  - 维护列表命令和写命令的通用工厂
+- `scripts/commands/list.js`
+  - 列表类命令，以及 `task:list` 的特殊分页抓取和本地过滤
+- `scripts/commands/write.js`
+  - 低风险写命令
+- `scripts/commands/goods.js`
+  - 商品命令，以及 `goods:edit` 的自动补全兼容逻辑
+- `scripts/commands/warehouse.js`
+  - 其他出入库、成品入库和仓库单据归一化逻辑
+- `scripts/commands/status.js`
+  - 加工单与任务状态流转命令
+- `scripts/commands/contract.js`
+  - `contract:add` 及其金额、税务、`enterprise_id` 归一化逻辑
+
+后续如果扩展 CLI：
+
+- 命令注册和帮助文本以 `scripts/commands/registry.js` 为准
+- 通用抽象优先补在 `scripts/commands/factories.js`
+- 特殊兼容逻辑不要为追求统一而抹平
 
 ### 示例字段映射
 
