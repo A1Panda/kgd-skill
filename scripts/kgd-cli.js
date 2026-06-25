@@ -8,6 +8,14 @@ const {
   openApiUploadFile,
   readJsonFile,
 } = require("./kgd-common");
+const { createHandlerFactories } = require("./commands/factories");
+const { buildContractCommands } = require("./commands/contract");
+const { buildGoodsCommands } = require("./commands/goods");
+const { buildListCommands } = require("./commands/list");
+const { buildStatusCommands } = require("./commands/status");
+const { buildWriteCommands } = require("./commands/write");
+const { buildWarehouseCommands } = require("./commands/warehouse");
+const { buildCommandDefinitions } = require("./commands/registry");
 
 function parseArgs(argv) {
   const result = {
@@ -59,45 +67,11 @@ function printUsage() {
   const lines = [
     "用法:",
     "  node ./scripts/kgd-cli.js <命令> [--base-url https://api.kgd.ltd] [--api-key xxx] [--api-secret xxx] [--username xxx]",
-    "  node ./scripts/kgd-cli.js verify",
-    "  node ./scripts/kgd-cli.js auth:test",
-    "  node ./scripts/kgd-cli.js token [--show-secrets]",
-    "  node ./scripts/kgd-cli.js build-fields --registry ./config/kgd-field-registry.example.json --input ./your-order.json --object goods",
-    "  node ./scripts/kgd-cli.js openapi:post --path /open_api/pub_craft/list --input ./payload.json [--dry-run]",
-    "  node ./scripts/kgd-cli.js upload:file --file ./demo.png [--dry-run]",
-    "  node ./scripts/kgd-cli.js goods:list --keyword 石墨盘 --page 1 --page-size 20",
-    "  node ./scripts/kgd-cli.js goods:add --input ./goods.json [--dry-run]",
-    "  node ./scripts/kgd-cli.js goods:edit --input ./goods.json [--dry-run]",
-    "  node ./scripts/kgd-cli.js goods:disable --id 8254248 --name 石墨盘 [--remark 误建停用] [--dry-run]",
-    "  node ./scripts/kgd-cli.js pub-craft:list --keyword 打磨 --page 1 --page-size 20",
-    "  node ./scripts/kgd-cli.js pub-craft:add --name 打磨 [--code GM001] [--reportable-user-ids-json '[1001,1002]'] [--dry-run]",
-    "  node ./scripts/kgd-cli.js pub-craft:edit --id 123456 --name 打磨 [--code GM001] [--reportable-user-ids-json '[1001,1002]'] [--dry-run]",
-    "  node ./scripts/kgd-cli.js else-stock-out:list [--keyword 石墨盘] [--page 1] [--page-size 20]",
-    "  node ./scripts/kgd-cli.js else-stock-out:add --goods-id 8253995 --num 10 --ware-name 成品仓 --stock-type-name 普通出库 --shipper-id 100753 [--bill-date 2026-06-23] [--remark 备注] [--dry-run]",
-    "  node ./scripts/kgd-cli.js else-stock-out:add --input ./stock-out-bill.json [--dry-run]",
-    "  node ./scripts/kgd-cli.js else-stock-in:list [--keyword 石墨盘] [--page 1] [--page-size 20]",
-    "  node ./scripts/kgd-cli.js else-stock-in:add --goods-id 8253995 --num 10 --ware-name 成品仓 --stock-type-name 普通入库 --consignee-id 100753 [--bill-date 2026-06-23] [--cost-price 0] [--selling-price 0] [--dry-run]",
-    "  node ./scripts/kgd-cli.js else-stock-in:add --input ./stock-in-bill.json [--dry-run]",
-    "  node ./scripts/kgd-cli.js customer:list --keyword 聚力 --page 1 --page-size 20",
-    "  node ./scripts/kgd-cli.js customer:add --name 聚力 --linkman-name 张三 [--mobile 13800000000] [--province-name 广东省] [--city-name 深圳市] [--area-name 南山区] [--address 科技园] [--dry-run]",
-    "  node ./scripts/kgd-cli.js supplier:list --keyword 碳材 --page 1 --page-size 20",
-    "  node ./scripts/kgd-cli.js supplier:add --name 某供应商 [--linkman-name 李四] [--linkman-mobile 13800000000] [--address 东莞] [--dry-run]",
-    "  node ./scripts/kgd-cli.js user:list --keyword 于英 --page 1 --page-size 20",
-    "  node ./scripts/kgd-cli.js produce-bill:list [--keyword 20260305001-4] [--code JGD0001] [--page 1] [--page-size 20]",
-    "  node ./scripts/kgd-cli.js produce-bill:add --goods-id 8253995 --num 10 [--code JGD20260624001] [--delivery-date 2026-06-30] [--craft-list-json '[\"打磨\",\"打码\"]'] [--dry-run]",
-    "  node ./scripts/kgd-cli.js produce-bill:status --id 123456 --type 1 [--cancel-reason 原因] [--dry-run]",
-    "  node ./scripts/kgd-cli.js produce-stock-in:list [--keyword JGD0001] [--page 1] [--page-size 20]",
-    "  node ./scripts/kgd-cli.js produce-stock-in:add --produce-bill-id 123456 --num 10 --ware-name 成品仓 [--bill-date 2026-06-23] [--stock-type-name 完工入库] [--remark 备注] [--dry-run]",
-    "  node ./scripts/kgd-cli.js produce-stock-in:add --input ./produce-stock-in-bill.json [--dry-run]",
-    "  node ./scripts/kgd-cli.js task:list [--produce-bill-code 20260305001-4] [--craft-name 打磨] [--status 未开始] [--all]",
-    "  node ./scripts/kgd-cli.js task:status --id 23437544 --status 3 [--dry-run]",
-    "  node ./scripts/kgd-cli.js report:list [--produce-craft-id 23437544] [--page 1] [--page-size 20]",
-    "  node ./scripts/kgd-cli.js report:add --input ./report.json [--dry-run]",
-    "  node ./scripts/kgd-cli.js report:edit --id 123456 --report-user-id 100753 --valid-num 10 --waste-num 0 [--is-finish 1] [--remark 补充修正] [--dry-run]",
-    "  node ./scripts/kgd-cli.js contract:list [--keyword 聚力] [--code HT20260623001] [--page 1] [--page-size 20]",
-    "  node ./scripts/kgd-cli.js contract:add --input ./contract.json [--dry-run]",
-    "  node ./scripts/kgd-cli.js contract:add --customer-id 1544650 --sales-user-id 144246 --goods-id 8253995 --num 10 --unit-price 100 --delivery-date 2026-06-30 --has-tax 1 [--linkman-id 1747835] [--money 1000] [--advance 300] [--code HT20260624001] [--remark 备注] [--dry-run]",
-    "  node ./scripts/kgd-cli.js contract:edit --input ./contract.json [--dry-run]",
+  ];
+  for (const definition of COMMAND_DEFINITIONS) {
+    lines.push(...definition.usage);
+  }
+  lines.push(
     "",
     "全局鉴权参数:",
     "  --base-url    临时覆盖 KGD_BASE_URL",
@@ -107,7 +81,7 @@ function printUsage() {
     "说明:",
     "  建议把 KGD_API_KEY/KGD_API_SECRET 作为固定企业配置写入运行环境。",
     "  不同用户主要确认 KGD_USERNAME；命令行参数优先于 .env，不写入仓库。",
-  ];
+  );
 
   process.stderr.write(`${lines.join("\n")}\n`);
 }
@@ -150,87 +124,6 @@ function printJson(data) {
 
 function isBlankValue(value) {
   return value === undefined || value === null || String(value).trim() === "";
-}
-
-function normalizeWarehouseBillItem(item, itemIndex, commandName, schema) {
-  if (!item || typeof item !== "object" || Array.isArray(item)) {
-    throw new Error(`${commandName} 缺少或错误的字段：item_list[${itemIndex}] 必须为对象`);
-  }
-
-  const nextItem = { ...item };
-  const requiredStringFields = schema.requiredStringFields || [];
-  const optionalStringFields = schema.optionalStringFields || [];
-  const requiredIntegerFields = schema.requiredIntegerFields || [];
-  const requiredNumberFields = schema.requiredNumberFields || [];
-  const optionalNumberFields = schema.optionalNumberFields || [];
-
-  for (const fieldName of requiredStringFields) {
-    nextItem[fieldName] = getRequiredStringValue(nextItem[fieldName], `item_list[${itemIndex}].${fieldName}`, commandName);
-  }
-  for (const fieldName of optionalStringFields) {
-    if (!isBlankValue(nextItem[fieldName])) {
-      nextItem[fieldName] = String(nextItem[fieldName]).trim();
-    }
-  }
-  for (const fieldName of requiredIntegerFields) {
-    nextItem[fieldName] = getRequiredPositiveIntValue(nextItem[fieldName], `item_list[${itemIndex}].${fieldName}`, commandName);
-  }
-  for (const fieldName of requiredNumberFields) {
-    nextItem[fieldName] = getRequiredPositiveNumberValue(nextItem[fieldName], `item_list[${itemIndex}].${fieldName}`, commandName);
-  }
-  for (const fieldName of optionalNumberFields) {
-    if (!isBlankValue(nextItem[fieldName])) {
-      nextItem[fieldName] = getOptionalNumberValue(nextItem[fieldName], `item_list[${itemIndex}].${fieldName}`, commandName);
-    }
-  }
-
-  return nextItem;
-}
-
-function normalizeWarehouseBillPayload(payload, commandName, schema) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    throw new Error(`${commandName} 缺少或错误的参数：payload 必须为对象`);
-  }
-
-  const nextPayload = { ...payload };
-  const requiredStringFields = schema.requiredStringFields || [];
-  const optionalStringFields = schema.optionalStringFields || [];
-  const requiredIntegerFields = schema.requiredIntegerFields || [];
-  const optionalIntegerFields = schema.optionalIntegerFields || [];
-
-  nextPayload.bill_date = isBlankValue(nextPayload.bill_date)
-    ? getTodayDateString()
-    : String(nextPayload.bill_date).trim();
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(nextPayload.bill_date)) {
-    throw new Error(`${commandName} 参数错误：bill_date 必须是 YYYY-MM-DD`);
-  }
-
-  for (const fieldName of requiredStringFields) {
-    nextPayload[fieldName] = getRequiredStringValue(nextPayload[fieldName], fieldName, commandName);
-  }
-  for (const fieldName of optionalStringFields) {
-    if (!isBlankValue(nextPayload[fieldName])) {
-      nextPayload[fieldName] = String(nextPayload[fieldName]).trim();
-    }
-  }
-  for (const fieldName of requiredIntegerFields) {
-    nextPayload[fieldName] = getRequiredPositiveIntValue(nextPayload[fieldName], fieldName, commandName);
-  }
-  for (const fieldName of optionalIntegerFields) {
-    if (!isBlankValue(nextPayload[fieldName])) {
-      nextPayload[fieldName] = getRequiredPositiveIntValue(nextPayload[fieldName], fieldName, commandName);
-    }
-  }
-
-  if (!Array.isArray(nextPayload.item_list) || nextPayload.item_list.length === 0) {
-    throw new Error(`${commandName} 缺少或错误的字段：item_list 至少需要一条明细`);
-  }
-
-  nextPayload.item_list = nextPayload.item_list.map((item, index) =>
-    normalizeWarehouseBillItem(item, index, commandName, schema.itemSchema),
-  );
-
-  return nextPayload;
 }
 
 function getRequiredFileArg(args) {
@@ -304,17 +197,6 @@ function getTodayDateString() {
   return `${year}-${month}-${day}`;
 }
 
-function toMoneyString(value, fallback = "0") {
-  if (value === undefined || value === null || String(value).trim() === "") {
-    return fallback;
-  }
-  const parsed = toNumber(value, Number.NaN);
-  if (!Number.isFinite(parsed)) {
-    return fallback;
-  }
-  return String(parsed);
-}
-
 function parseJsonArg(value, argName, fallback) {
   if (value === undefined || value === null || String(value).trim() === "") {
     return fallback;
@@ -324,175 +206,6 @@ function parseJsonArg(value, argName, fallback) {
   } catch (error) {
     throw new Error(`--${argName} 不是合法 JSON`);
   }
-}
-
-function normalizeHasTaxValue(value, commandName) {
-  const normalized = String(value ?? "").trim().toLowerCase();
-  if (["1", "true", "yes", "y", "是"].includes(normalized)) {
-    return 1;
-  }
-  if (["0", "2", "false", "no", "n", "否"].includes(normalized)) {
-    return 2;
-  }
-  throw new Error(`${commandName} 缺少或错误的参数：--has-tax 必须为 1/0/2/是/否`);
-}
-
-function inferEnterpriseIdFromLoginData(loginData) {
-  if (Array.isArray(loginData?.team)) {
-    for (const team of loginData.team) {
-      const enterpriseId = toInt(team?.enterprise_id, 0);
-      if (enterpriseId) {
-        return enterpriseId;
-      }
-    }
-  }
-
-  const departmentEnterpriseId = toInt(loginData?.department?.enterprise_id, 0);
-  if (departmentEnterpriseId) {
-    return departmentEnterpriseId;
-  }
-
-  return 0;
-}
-
-function normalizeContractAddPayload(payload, context) {
-  const nextPayload = payload && typeof payload === "object" ? { ...payload } : {};
-  const inferredEnterpriseId = inferEnterpriseIdFromLoginData(context?.loginData);
-
-  if (!toInt(nextPayload.enterprise_id, 0) && inferredEnterpriseId) {
-    nextPayload.enterprise_id = inferredEnterpriseId;
-  }
-
-  if (!Array.isArray(nextPayload.fieldValueList)) {
-    nextPayload.fieldValueList = [];
-  }
-
-  if (Array.isArray(nextPayload.item_list)) {
-    nextPayload.item_list = nextPayload.item_list.map((item) => {
-      const nextItem = item && typeof item === "object" ? { ...item } : {};
-      const num = toNumber(nextItem.num, Number.NaN);
-      const unitPrice = toNumber(nextItem.unit_price, Number.NaN);
-
-      if (nextItem.money === undefined && Number.isFinite(num) && Number.isFinite(unitPrice)) {
-        nextItem.money = toMoneyString(num * unitPrice);
-      } else if (nextItem.money !== undefined) {
-        nextItem.money = toMoneyString(nextItem.money);
-      }
-
-      if (nextItem.discount === undefined) {
-        nextItem.discount = "10";
-      } else {
-        nextItem.discount = String(nextItem.discount);
-      }
-
-      if (nextItem.discount_money === undefined) {
-        nextItem.discount_money = "0";
-      } else {
-        nextItem.discount_money = toMoneyString(nextItem.discount_money);
-      }
-
-      if (nextItem.after_discount_money === undefined) {
-        const baseMoney = toNumber(nextItem.money, 0);
-        const discountMoney = toNumber(nextItem.discount_money, 0);
-        nextItem.after_discount_money = toMoneyString(baseMoney - discountMoney);
-      } else {
-        nextItem.after_discount_money = toMoneyString(nextItem.after_discount_money);
-      }
-
-      return nextItem;
-    });
-  }
-
-  if (nextPayload.money !== undefined) {
-    nextPayload.money = toMoneyString(nextPayload.money);
-  }
-  if (nextPayload.advance !== undefined) {
-    nextPayload.advance = toMoneyString(nextPayload.advance);
-  }
-
-  return nextPayload;
-}
-
-function buildContractAddPayloadFromArgs(args) {
-  const commandName = "contract:add";
-  const deliveryDate = getRequiredStringArg(args, "delivery-date", commandName);
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(deliveryDate)) {
-    throw new Error(`${commandName} 参数错误：--delivery-date 必须是 YYYY-MM-DD`);
-  }
-
-  const customerId = toInt(args["customer-id"], 0);
-  const salesUserId = toInt(args["sales-user-id"], 0);
-  const goodsId = toInt(args["goods-id"], 0);
-  if (!customerId) {
-    throw new Error(`${commandName} 缺少或错误的参数：--customer-id 必须为正整数`);
-  }
-  if (!salesUserId) {
-    throw new Error(`${commandName} 缺少或错误的参数：--sales-user-id 必须为正整数`);
-  }
-  if (!goodsId) {
-    throw new Error(`${commandName} 缺少或错误的参数：--goods-id 必须为正整数`);
-  }
-
-  const num = getRequiredPositiveNumberArg(args, "num", commandName);
-  const unitPrice = getRequiredPositiveNumberArg(args, "unit-price", commandName);
-  const itemRemark = args["item-remark"] ? String(args["item-remark"]) : args.remark ? String(args.remark) : "";
-  const itemMoney =
-    args["item-money"] !== undefined
-      ? toMoneyString(args["item-money"])
-      : toMoneyString(num * unitPrice);
-  const discountMoney = args["discount-money"] !== undefined ? toMoneyString(args["discount-money"]) : "0";
-  const afterDiscountMoney =
-    args["after-discount-money"] !== undefined
-      ? toMoneyString(args["after-discount-money"])
-      : toMoneyString(toNumber(itemMoney, 0) - toNumber(discountMoney, 0));
-
-  const payload = {
-    customer_id: customerId,
-    sales_user_id: salesUserId,
-    delivery_date: deliveryDate,
-    has_tax: normalizeHasTaxValue(args["has-tax"], commandName),
-    money: args.money !== undefined ? toMoneyString(args.money) : afterDiscountMoney,
-    advance: args.advance !== undefined ? toMoneyString(args.advance) : "0",
-    item_list: [
-      {
-        goods_id: goodsId,
-        num,
-        unit_price: toMoneyString(unitPrice),
-        remark: itemRemark,
-        money: itemMoney,
-        discount: args.discount !== undefined ? String(args.discount) : "10",
-        discount_money: discountMoney,
-        after_discount_money: afterDiscountMoney,
-      },
-    ],
-    fieldValueList: parseJsonArg(args["field-values-json"], "field-values-json", []),
-  };
-
-  if (args["linkman-id"]) {
-    payload.linkman_id = toInt(args["linkman-id"], 0);
-    if (!payload.linkman_id) {
-      throw new Error(`${commandName} 缺少或错误的参数：--linkman-id 必须为正整数`);
-    }
-  }
-  if (args.code) {
-    payload.code = String(args.code);
-  }
-  if (args.remark) {
-    payload.remark = String(args.remark);
-  }
-  if (args["enterprise-id"]) {
-    payload.enterprise_id = toInt(args["enterprise-id"], 0);
-    if (!payload.enterprise_id) {
-      throw new Error(`${commandName} 缺少或错误的参数：--enterprise-id 必须为正整数`);
-    }
-  }
-
-  const itemFieldValueList = parseJsonArg(args["item-field-values-json"], "item-field-values-json", undefined);
-  if (itemFieldValueList !== undefined) {
-    payload.item_list[0].fieldValueList = itemFieldValueList;
-  }
-
-  return payload;
 }
 
 function buildProduceBillAddPayloadFromArgs(args) {
@@ -685,123 +398,6 @@ function buildGoodsDisablePayloadFromArgs(args) {
   return payload;
 }
 
-function buildElseStockOutPayloadFromArgs(args) {
-  const commandName = "else-stock-out:add";
-  const payload = {
-    bill_date: args["bill-date"] ? String(args["bill-date"]).trim() : getTodayDateString(),
-    ware_name: getRequiredStringArg(args, "ware-name", commandName),
-    stock_type_name: getRequiredStringArg(args, "stock-type-name", commandName),
-    shipper_id: toInt(args["shipper-id"], 0),
-    item_list: [
-      {
-        goods_id: toInt(args["goods-id"], 0),
-        num: getRequiredPositiveNumberArg(args, "num", commandName),
-      },
-    ],
-  };
-
-  if (!payload.shipper_id) {
-    throw new Error(`${commandName} 缺少或错误的参数：--shipper-id 必须为正整数`);
-  }
-  if (!payload.item_list[0].goods_id) {
-    throw new Error(`${commandName} 缺少或错误的参数：--goods-id 必须为正整数`);
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.bill_date)) {
-    throw new Error(`${commandName} 参数错误：--bill-date 必须是 YYYY-MM-DD`);
-  }
-  if (args.remark) {
-    payload.remark = String(args.remark);
-  }
-  if (args["item-remark"]) {
-    payload.item_list[0].remark = String(args["item-remark"]);
-  }
-  if (args["field-values-json"]) {
-    payload.fieldValueList = parseJsonArg(args["field-values-json"], "field-values-json", []);
-  }
-
-  return payload;
-}
-
-function buildProduceStockInPayloadFromArgs(args) {
-  const commandName = "produce-stock-in:add";
-  const payload = {
-    bill_date: args["bill-date"] ? String(args["bill-date"]).trim() : getTodayDateString(),
-    ware_name: getRequiredStringArg(args, "ware-name", commandName),
-    item_list: [
-      {
-        produce_bill_id: toInt(args["produce-bill-id"], 0),
-        num: getRequiredPositiveNumberArg(args, "num", commandName),
-      },
-    ],
-  };
-
-  if (!payload.item_list[0].produce_bill_id) {
-    throw new Error(`${commandName} 缺少或错误的参数：--produce-bill-id 必须为正整数`);
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.bill_date)) {
-    throw new Error(`${commandName} 参数错误：--bill-date 必须是 YYYY-MM-DD`);
-  }
-  if (args["stock-type-name"]) {
-    payload.stock_type_name = String(args["stock-type-name"]);
-  }
-  if (args.remark) {
-    payload.remark = String(args.remark);
-  }
-  if (args["item-remark"]) {
-    payload.item_list[0].remark = String(args["item-remark"]);
-  }
-  if (args["field-values-json"]) {
-    payload.fieldValueList = parseJsonArg(args["field-values-json"], "field-values-json", []);
-  }
-
-  return payload;
-}
-
-function buildElseStockInPayloadFromArgs(args) {
-  const commandName = "else-stock-in:add";
-  const payload = {
-    bill_date: args["bill-date"] ? String(args["bill-date"]).trim() : getTodayDateString(),
-    ware_name: getRequiredStringArg(args, "ware-name", commandName),
-    stock_type_name: getRequiredStringArg(args, "stock-type-name", commandName),
-    consignee_id: toInt(args["consignee-id"], 0),
-    item_list: [
-      {
-        goods_id: toInt(args["goods-id"], 0),
-        num: getRequiredPositiveNumberArg(args, "num", commandName),
-        cost_price: getOptionalNumberArg(args, "cost-price", 0),
-        selling_price: getOptionalNumberArg(args, "selling-price", 0),
-      },
-    ],
-  };
-
-  if (!payload.consignee_id) {
-    throw new Error(`${commandName} 缺少或错误的参数：--consignee-id 必须为正整数`);
-  }
-  if (!payload.item_list[0].goods_id) {
-    throw new Error(`${commandName} 缺少或错误的参数：--goods-id 必须为正整数`);
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.bill_date)) {
-    throw new Error(`${commandName} 参数错误：--bill-date 必须是 YYYY-MM-DD`);
-  }
-  if (args["supplier-id"]) {
-    payload.supplier_id = toInt(args["supplier-id"], 0);
-    if (!payload.supplier_id) {
-      throw new Error(`${commandName} 缺少或错误的参数：--supplier-id 必须为正整数`);
-    }
-  }
-  if (args.remark) {
-    payload.remark = String(args.remark);
-  }
-  if (args["item-remark"]) {
-    payload.item_list[0].remark = String(args["item-remark"]);
-  }
-  if (args["field-values-json"]) {
-    payload.fieldValueList = parseJsonArg(args["field-values-json"], "field-values-json", []);
-  }
-
-  return payload;
-}
-
 function buildPubCraftPayloadFromArgs(args, mode) {
   const commandName = mode === "edit" ? "pub-craft:edit" : "pub-craft:add";
   const payload = {
@@ -895,6 +491,132 @@ function getAuthOverrides(args) {
     username: args.username,
   };
 }
+
+const { buildPaginationBody, buildKeywordListBody, createListHandler, createWriteHandler } = createHandlerFactories({
+  createAuthContext,
+  getAuthOverrides,
+  openApiPost,
+  printJson,
+  toBool,
+  toInt,
+});
+const {
+  commandGoodsList,
+  commandGoodsAdd,
+  commandGoodsEdit,
+  commandGoodsDisable,
+} = buildGoodsCommands({
+  buildGoodsDisablePayloadFromArgs,
+  buildKeywordListBody,
+  createAuthContext,
+  createListHandler,
+  getAuthOverrides,
+  hasJsonInput,
+  isBlankValue,
+  loadJsonInput,
+  openApiPost,
+  printJson,
+  toBool,
+  toInt,
+});
+const {
+  commandPubCraftList,
+  commandElseStockOutList,
+  commandElseStockInList,
+  commandCustomerList,
+  commandSupplierList,
+  commandUserList,
+  commandProduceBillList,
+  commandProduceStockInList,
+  commandTaskList,
+  commandReportList,
+  commandContractList,
+} = buildListCommands({
+  buildKeywordListBody,
+  buildPaginationBody,
+  createAuthContext,
+  createListHandler,
+  getAuthOverrides,
+  openApiPost,
+  printJson,
+  toBool,
+  toInt,
+});
+const {
+  commandCustomerAdd,
+  commandSupplierAdd,
+  commandPubCraftAdd,
+  commandPubCraftEdit,
+  commandProduceBillAdd,
+  commandReportAdd,
+  commandReportEdit,
+  commandContractEdit,
+} = buildWriteCommands({
+  buildCustomerAddPayloadFromArgs,
+  buildProduceBillAddPayloadFromArgs,
+  buildPubCraftPayloadFromArgs,
+  buildReportEditPayloadFromArgs,
+  buildSupplierAddPayloadFromArgs,
+  createWriteHandler,
+  hasJsonInput,
+  loadJsonInput,
+});
+const {
+  commandElseStockOutAdd,
+  commandElseStockInAdd,
+  commandProduceStockInAdd,
+} = buildWarehouseCommands({
+  createAuthContext,
+  getAuthOverrides,
+  getOptionalNumberArg,
+  getOptionalNumberValue,
+  getRequiredPositiveIntValue,
+  getRequiredPositiveNumberArg,
+  getRequiredPositiveNumberValue,
+  getRequiredStringArg,
+  getRequiredStringValue,
+  getTodayDateString,
+  hasJsonInput,
+  isBlankValue,
+  loadJsonInput,
+  openApiPost,
+  parseJsonArg,
+  printJson,
+  toBool,
+  toInt,
+});
+const { commandProduceBillStatus, commandTaskStatus } = buildStatusCommands({
+  createAuthContext,
+  getAuthOverrides,
+  openApiPost,
+  printJson,
+  toBool,
+  toInt,
+});
+const { commandContractAdd } = buildContractCommands({
+  createAuthContext,
+  getAuthOverrides,
+  getRequiredPositiveNumberArg,
+  getRequiredStringArg,
+  hasJsonInput,
+  loadJsonInput,
+  openApiPost,
+  parseJsonArg,
+  printJson,
+  toBool,
+  toInt,
+  toMoneyString: (value, fallback = "0") => {
+    if (value === undefined || value === null || String(value).trim() === "") {
+      return fallback;
+    }
+    const parsed = toNumber(value, Number.NaN);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    return String(parsed);
+  },
+  toNumber,
+});
 
 async function commandVerify(args) {
   const context = await createAuthContext(getAuthOverrides(args));
@@ -1003,727 +725,63 @@ function commandBuildFields(args) {
   printJson(fieldValueList);
 }
 
-async function commandGoodsList(args) {
-  const context = await createAuthContext(getAuthOverrides(args));
-  const body = {
-    goods_keyword: args.keyword ? String(args.keyword) : "",
-    pageNo: toInt(args.page, 1),
-    pageSize: toInt(args["page-size"], 20),
-  };
-  const json = await openApiPost(context, "/open_api/goods/list", body);
-  printJson(json);
-}
-
-async function completeGoodsEditPayload(context, payload) {
-  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
-    return payload;
-  }
-
-  const nextPayload = { ...payload };
-  const needsBaseFields =
-    isBlankValue(nextPayload.name) ||
-    isBlankValue(nextPayload.code) ||
-    isBlankValue(nextPayload.standard) ||
-    (isBlankValue(nextPayload.unit) && isBlankValue(nextPayload.unit_name));
-
-  if (!needsBaseFields) {
-    return nextPayload;
-  }
-
-  const goodsId = toInt(nextPayload.id, 0);
-  if (!goodsId) {
-    throw new Error("goods:edit 缺少或错误的参数：缺少 id，无法自动补全 name/code/standard/unit");
-  }
-
-  const json = await openApiPost(context, "/open_api/goods/list", {
-    id: goodsId,
-    pageNo: 1,
-    pageSize: 1,
-  });
-  const rows = Array.isArray(json.data) ? json.data : [];
-  const existing =
-    rows.find((item) => toInt(item?.id, 0) === goodsId) ||
-    rows.find((item) => item && typeof item === "object");
-
-  if (!existing) {
-    throw new Error(`goods:edit 无法根据 id=${goodsId} 查询现有商品，不能自动补全基础字段`);
-  }
-
-  if (isBlankValue(nextPayload.name) && !isBlankValue(existing.name)) {
-    nextPayload.name = existing.name;
-  }
-  if (isBlankValue(nextPayload.code) && !isBlankValue(existing.code)) {
-    nextPayload.code = existing.code;
-  }
-  if (isBlankValue(nextPayload.standard) && !isBlankValue(existing.standard)) {
-    nextPayload.standard = existing.standard;
-  }
-
-  const existingUnit = !isBlankValue(existing.unit) ? existing.unit : existing.unit_name;
-  if (isBlankValue(nextPayload.unit) && !isBlankValue(existingUnit)) {
-    nextPayload.unit = existingUnit;
-  }
-  if (isBlankValue(nextPayload.unit_name) && !isBlankValue(existingUnit)) {
-    nextPayload.unit_name = existingUnit;
-  }
-
-  return nextPayload;
-}
-
-async function commandGoodsWrite(args, mode) {
-  const payload = loadJsonInput(args);
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: mode === "add" ? "/open_api/goods/add" : "/open_api/goods/edit",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const apiPath = mode === "add" ? "/open_api/goods/add" : "/open_api/goods/edit";
-  const payloadList = Array.isArray(payload) ? payload : [payload];
-  const normalizedPayloadList = [];
-
-  for (const item of payloadList) {
-    normalizedPayloadList.push(mode === "edit" ? await completeGoodsEditPayload(context, item) : item);
-  }
-
-  if (Array.isArray(payload)) {
-    const results = [];
-    for (const item of normalizedPayloadList) {
-      results.push(await openApiPost(context, apiPath, item));
-    }
-    printJson({
-      success: true,
-      data: results,
-    });
-    return;
-  }
-
-  const json = await openApiPost(context, apiPath, normalizedPayloadList[0]);
-  printJson(json);
-}
-
-async function commandGoodsDisable(args) {
-  const payload = hasJsonInput(args) ? loadJsonInput(args) : buildGoodsDisablePayloadFromArgs(args);
-  payload.is_enable = 0;
-
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/goods/edit",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, "/open_api/goods/edit", payload);
-  printJson(json);
-}
-
-async function commandPubCraftList(args) {
-  const context = await createAuthContext(getAuthOverrides(args));
-  const body = {
-    keyword: args.keyword ? String(args.keyword) : "",
-    pageNo: toInt(args.page, 1),
-    pageSize: toInt(args["page-size"], 20),
-  };
-  const json = await openApiPost(context, "/open_api/pub_craft/list", body);
-  printJson(json);
-}
-
-async function commandPubCraftWrite(args, mode) {
-  const payload = hasJsonInput(args) ? loadJsonInput(args) : buildPubCraftPayloadFromArgs(args, mode);
-  const api = mode === "edit" ? "/open_api/pub_craft/edit" : "/open_api/pub_craft/add";
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api,
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, api, payload);
-  printJson(json);
-}
-
-async function commandWarehouseBillAdd(args, schema) {
-  const rawPayload = hasJsonInput(args) ? loadJsonInput(args) : schema.buildPayloadFromArgs(args);
-  const payloadList = Array.isArray(rawPayload) ? rawPayload : [rawPayload];
-  const normalizedPayloadList = payloadList.map((item) =>
-    normalizeWarehouseBillPayload(item, schema.commandName, schema.payloadSchema),
-  );
-
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: schema.apiPath,
-      payload: Array.isArray(rawPayload) ? normalizedPayloadList : normalizedPayloadList[0],
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  if (Array.isArray(rawPayload)) {
-    const results = [];
-    for (const item of normalizedPayloadList) {
-      results.push(await openApiPost(context, schema.apiPath, item));
-    }
-    printJson({
-      success: true,
-      data: results,
-    });
-    return;
-  }
-
-  const json = await openApiPost(context, schema.apiPath, normalizedPayloadList[0]);
-  printJson(json);
-}
-
-async function commandElseStockOutList(args) {
-  const context = await createAuthContext(getAuthOverrides(args));
-  const body = {
-    keyword: args.keyword ? String(args.keyword) : "",
-    pageNo: toInt(args.page, 1),
-    pageSize: toInt(args["page-size"], 20),
-  };
-  const json = await openApiPost(context, "/open_api/else_stock_out_bill/list", body);
-  printJson(json);
-}
-
-async function commandElseStockOutAdd(args) {
-  await commandWarehouseBillAdd(args, {
-    commandName: "else-stock-out:add",
-    apiPath: "/open_api/else_stock_out_bill/add",
-    buildPayloadFromArgs: buildElseStockOutPayloadFromArgs,
-    payloadSchema: {
-      requiredStringFields: ["ware_name", "stock_type_name"],
-      optionalStringFields: ["remark"],
-      requiredIntegerFields: ["shipper_id"],
-      itemSchema: {
-        requiredIntegerFields: ["goods_id"],
-        requiredNumberFields: ["num"],
-        optionalStringFields: ["remark"],
-      },
-    },
-  });
-}
-
-async function commandElseStockInList(args) {
-  const context = await createAuthContext(getAuthOverrides(args));
-  const body = {
-    keyword: args.keyword ? String(args.keyword) : "",
-    pageNo: toInt(args.page, 1),
-    pageSize: toInt(args["page-size"], 20),
-  };
-  const json = await openApiPost(context, "/open_api/else_stock_in_bill/list", body);
-  printJson(json);
-}
-
-async function commandElseStockInAdd(args) {
-  await commandWarehouseBillAdd(args, {
-    commandName: "else-stock-in:add",
-    apiPath: "/open_api/else_stock_in_bill/add",
-    buildPayloadFromArgs: buildElseStockInPayloadFromArgs,
-    payloadSchema: {
-      requiredStringFields: ["ware_name", "stock_type_name"],
-      optionalStringFields: ["remark"],
-      requiredIntegerFields: ["consignee_id"],
-      optionalIntegerFields: ["supplier_id"],
-      itemSchema: {
-        requiredIntegerFields: ["goods_id"],
-        requiredNumberFields: ["num"],
-        optionalNumberFields: ["cost_price", "selling_price"],
-        optionalStringFields: ["remark"],
-      },
-    },
-  });
-}
-
-async function commandCustomerList(args) {
-  const context = await createAuthContext(getAuthOverrides(args));
-  const body = {
-    keyword: args.keyword ? String(args.keyword) : "",
-    pageNo: toInt(args.page, 1),
-    pageSize: toInt(args["page-size"], 20),
-  };
-  const json = await openApiPost(context, "/open_api/customer/list", body);
-  printJson(json);
-}
-
-async function commandCustomerAdd(args) {
-  const payload = hasJsonInput(args) ? loadJsonInput(args) : buildCustomerAddPayloadFromArgs(args);
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/customer/add",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, "/open_api/customer/add", payload);
-  printJson(json);
-}
-
-async function commandSupplierList(args) {
-  const context = await createAuthContext(getAuthOverrides(args));
-  const body = {
-    keyword: args.keyword ? String(args.keyword) : "",
-    pageNo: toInt(args.page, 1),
-    pageSize: toInt(args["page-size"], 20),
-  };
-  const json = await openApiPost(context, "/open_api/supplier/list", body);
-  printJson(json);
-}
-
-async function commandSupplierAdd(args) {
-  const payload = hasJsonInput(args) ? loadJsonInput(args) : buildSupplierAddPayloadFromArgs(args);
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/supplier/add",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, "/open_api/supplier/add", payload);
-  printJson(json);
-}
-
-async function commandUserList(args) {
-  const context = await createAuthContext(getAuthOverrides(args));
-  const body = {
-    keyword: args.keyword ? String(args.keyword) : "",
-    pageNo: toInt(args.page, 1),
-    pageSize: toInt(args["page-size"], 20),
-  };
-  const json = await openApiPost(context, "/open_api/user/list", body);
-  printJson(json);
-}
-
-async function commandProduceBillList(args) {
-  const context = await createAuthContext(getAuthOverrides(args));
-  const body = {
-    pageNo: toInt(args.page, 1),
-    pageSize: toInt(args["page-size"], 20),
-  };
-
-  if (args.keyword) {
-    body.keyword = String(args.keyword);
-  }
-  if (args.code) {
-    body.code = String(args.code);
-  }
-  if (args.status) {
-    body.status = args.status;
-  }
-
-  const json = await openApiPost(context, "/open_api/produce_bill/list", body);
-  printJson(json);
-}
-
-async function commandProduceBillAdd(args) {
-  const payload = hasJsonInput(args) ? loadJsonInput(args) : buildProduceBillAddPayloadFromArgs(args);
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/produce_bill/add",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, "/open_api/produce_bill/add", payload);
-  printJson(json);
-}
-
-async function commandProduceBillStatus(args) {
-  const id = toInt(args.id, 0);
-  const type = toInt(args.type, 0);
-
-  if (!id) {
-    throw new Error("produce-bill:status 缺少参数：--id");
-  }
-  if (![1, 2, 3, 4].includes(type)) {
-    throw new Error("produce-bill:status 缺少或错误的参数：--type 必须为 1/2/3/4");
-  }
-
-  const payload = {
-    id,
-    type,
-  };
-
-  if (type === 4) {
-    if (!args["cancel-reason"]) {
-      throw new Error("取消加工单时必须提供 --cancel-reason");
-    }
-    payload.cancel_reason = String(args["cancel-reason"]);
-  }
-
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/produce_bill/edit_status",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, "/open_api/produce_bill/edit_status", payload);
-  printJson(json);
-}
-
-async function commandProduceStockInList(args) {
-  const context = await createAuthContext(getAuthOverrides(args));
-  const body = {
-    keyword: args.keyword ? String(args.keyword) : "",
-    pageNo: toInt(args.page, 1),
-    pageSize: toInt(args["page-size"], 20),
-  };
-  const json = await openApiPost(context, "/open_api/produce_stock_in_bill/list", body);
-  printJson(json);
-}
-
-async function commandProduceStockInAdd(args) {
-  await commandWarehouseBillAdd(args, {
-    commandName: "produce-stock-in:add",
-    apiPath: "/open_api/produce_stock_in_bill/add",
-    buildPayloadFromArgs: buildProduceStockInPayloadFromArgs,
-    payloadSchema: {
-      requiredStringFields: ["ware_name"],
-      optionalStringFields: ["stock_type_name", "remark"],
-      itemSchema: {
-        requiredIntegerFields: ["produce_bill_id"],
-        requiredNumberFields: ["num"],
-        optionalStringFields: ["remark"],
-      },
-    },
-  });
-}
-
-async function commandTaskList(args) {
-  const context = await createAuthContext(getAuthOverrides(args));
-  const targetProduceBillCode = args["produce-bill-code"] ? String(args["produce-bill-code"]) : "";
-  const targetCraftName = args["craft-name"] ? String(args["craft-name"]) : "";
-  const targetStatus = args.status ? String(args.status) : "";
-  const fetchAll = toBool(args.all) || (targetProduceBillCode && (targetCraftName || targetStatus));
-  const pageSize = toInt(args["page-size"], 200);
-
-  const allRows = [];
-  let pageNo = toInt(args.page, 1);
-
-  while (true) {
-    const requestBody = {
-      pageNo,
-      pageSize,
-    };
-
-    if (targetProduceBillCode) {
-      requestBody.produce_bill_code = targetProduceBillCode;
-    }
-
-    const json = await openApiPost(context, "/open_api/produce_bill_craft/list", requestBody);
-    const rows = Array.isArray(json.data) ? json.data : [];
-    if (!rows.length) {
-      break;
-    }
-
-    allRows.push(...rows);
-
-    if (!fetchAll || rows.length < pageSize) {
-      break;
-    }
-
-    pageNo += 1;
-  }
-
-  const filtered = allRows.filter((item) => {
-    const matchedProduceBillCode =
-      !targetProduceBillCode || item?.produce_bill?.code === targetProduceBillCode;
-    const matchedCraftName = !targetCraftName || item?.pub_craft?.name === targetCraftName;
-    const matchedStatus = !targetStatus || item?.status_name === targetStatus;
-    return matchedProduceBillCode && matchedCraftName && matchedStatus;
-  });
-
-  printJson({
-    count: filtered.length,
-    data: filtered,
-  });
-}
-
-async function commandTaskStatus(args) {
-  const status = toInt(args.status, 0);
-  const id = toInt(args.id, 0);
-  if (!id) {
-    throw new Error("task:status 缺少参数：--id");
-  }
-  if (![1, 2, 3, 4].includes(status)) {
-    throw new Error("task:status 缺少或错误的参数：--status 必须为 1/2/3/4");
-  }
-
-  const payload = {
-    id,
-    status,
-  };
-
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/produce_bill_craft/edit_status",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, "/open_api/produce_bill_craft/edit_status", payload);
-  printJson(json);
-}
-
-async function commandReportAdd(args) {
-  const payload = loadJsonInput(args);
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/report_work_record/add",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, "/open_api/report_work_record/add", payload);
-  printJson(json);
-}
-
-async function commandReportEdit(args) {
-  const payload = hasJsonInput(args) ? loadJsonInput(args) : buildReportEditPayloadFromArgs(args);
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/report_work_record/edit",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, "/open_api/report_work_record/edit", payload);
-  printJson(json);
-}
-
-async function commandReportList(args) {
-  const context = await createAuthContext(getAuthOverrides(args));
-  const body = {
-    pageNo: toInt(args.page, 1),
-    pageSize: toInt(args["page-size"], 20),
-  };
-
-  if (args["produce-craft-id"]) {
-    body.produce_craft_id = toInt(args["produce-craft-id"], 0);
-  }
-  if (args["produce-bill-code"]) {
-    body.produce_bill_code = String(args["produce-bill-code"]);
-  }
-  if (args.keyword) {
-    body.keyword = String(args.keyword);
-  }
-
-  const json = await openApiPost(context, "/open_api/report_work_record/list", body);
-  printJson(json);
-}
-
-async function commandContractList(args) {
-  const context = await createAuthContext(getAuthOverrides(args));
-  const body = {
-    keyword: args.keyword ? String(args.keyword) : "",
-    code: args.code ? String(args.code) : "",
-    pageNo: toInt(args.page, 1),
-    pageSize: toInt(args["page-size"], 20),
-  };
-  const json = await openApiPost(context, "/open_api/customer_contract/list", body);
-  printJson(json);
-}
-
-async function commandContractAdd(args) {
-  if (hasJsonInput(args)) {
-    const rawPayload = loadJsonInput(args);
-    const context = await createAuthContext(getAuthOverrides(args));
-    const payload = normalizeContractAddPayload(rawPayload, context);
-    if (toBool(args["dry-run"])) {
-      printJson({
-        dry_run: true,
-        api: "/open_api/customer_contract/add",
-        payload,
-      });
-      return;
-    }
-
-    const json = await openApiPost(context, "/open_api/customer_contract/add", payload);
-    printJson(json);
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const payload = normalizeContractAddPayload(buildContractAddPayloadFromArgs(args), context);
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/customer_contract/add",
-      payload,
-    });
-    return;
-  }
-
-  const json = await openApiPost(context, "/open_api/customer_contract/add", payload);
-  printJson(json);
-}
-
-async function commandContractEdit(args) {
-  const payload = loadJsonInput(args);
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/customer_contract/edit",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, "/open_api/customer_contract/edit", payload);
-  printJson(json);
-}
+const COMMAND_DEFINITIONS = buildCommandDefinitions({
+  commandVerify,
+  commandAuthTest,
+  commandToken,
+  commandBuildFields,
+  commandOpenApiPost,
+  commandUploadFile,
+  commandGoodsList,
+  commandGoodsAdd,
+  commandGoodsEdit,
+  commandGoodsDisable,
+  commandPubCraftList,
+  commandPubCraftAdd,
+  commandPubCraftEdit,
+  commandElseStockOutList,
+  commandElseStockOutAdd,
+  commandElseStockInList,
+  commandElseStockInAdd,
+  commandCustomerList,
+  commandCustomerAdd,
+  commandSupplierList,
+  commandSupplierAdd,
+  commandUserList,
+  commandProduceBillList,
+  commandProduceBillAdd,
+  commandProduceBillStatus,
+  commandProduceStockInList,
+  commandProduceStockInAdd,
+  commandTaskList,
+  commandTaskStatus,
+  commandReportList,
+  commandReportAdd,
+  commandReportEdit,
+  commandContractList,
+  commandContractAdd,
+  commandContractEdit,
+});
+
+const COMMAND_REGISTRY = Object.freeze(
+  Object.fromEntries(COMMAND_DEFINITIONS.map((definition) => [definition.name, definition.handler])),
+);
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const command = args._[0];
+  const handler = COMMAND_REGISTRY[command];
 
   if (!command || command === "help" || command === "--help") {
     printUsage();
     return;
   }
 
-  switch (command) {
-    case "verify":
-      await commandVerify(args);
-      return;
-    case "auth:test":
-      await commandAuthTest(args);
-      return;
-    case "token":
-      await commandToken(args);
-      return;
-    case "build-fields":
-      commandBuildFields(args);
-      return;
-    case "openapi:post":
-      await commandOpenApiPost(args);
-      return;
-    case "upload:file":
-      await commandUploadFile(args);
-      return;
-    case "goods:list":
-      await commandGoodsList(args);
-      return;
-    case "goods:add":
-      await commandGoodsWrite(args, "add");
-      return;
-    case "goods:edit":
-      await commandGoodsWrite(args, "edit");
-      return;
-    case "goods:disable":
-      await commandGoodsDisable(args);
-      return;
-    case "pub-craft:list":
-      await commandPubCraftList(args);
-      return;
-    case "pub-craft:add":
-      await commandPubCraftWrite(args, "add");
-      return;
-    case "pub-craft:edit":
-      await commandPubCraftWrite(args, "edit");
-      return;
-    case "else-stock-out:list":
-      await commandElseStockOutList(args);
-      return;
-    case "else-stock-out:add":
-      await commandElseStockOutAdd(args);
-      return;
-    case "else-stock-in:list":
-      await commandElseStockInList(args);
-      return;
-    case "else-stock-in:add":
-      await commandElseStockInAdd(args);
-      return;
-    case "customer:list":
-      await commandCustomerList(args);
-      return;
-    case "customer:add":
-      await commandCustomerAdd(args);
-      return;
-    case "supplier:list":
-      await commandSupplierList(args);
-      return;
-    case "supplier:add":
-      await commandSupplierAdd(args);
-      return;
-    case "user:list":
-      await commandUserList(args);
-      return;
-    case "produce-bill:list":
-      await commandProduceBillList(args);
-      return;
-    case "produce-bill:add":
-      await commandProduceBillAdd(args);
-      return;
-    case "produce-bill:status":
-      await commandProduceBillStatus(args);
-      return;
-    case "produce-stock-in:list":
-      await commandProduceStockInList(args);
-      return;
-    case "produce-stock-in:add":
-      await commandProduceStockInAdd(args);
-      return;
-    case "task:list":
-      await commandTaskList(args);
-      return;
-    case "task:status":
-      await commandTaskStatus(args);
-      return;
-    case "report:list":
-      await commandReportList(args);
-      return;
-    case "report:add":
-      await commandReportAdd(args);
-      return;
-    case "report:edit":
-      await commandReportEdit(args);
-      return;
-    case "contract:list":
-      await commandContractList(args);
-      return;
-    case "contract:add":
-      await commandContractAdd(args);
-      return;
-    case "contract:edit":
-      await commandContractEdit(args);
-      return;
-    default:
-      throw new Error(`未知命令: ${command}`);
+  if (!handler) {
+    throw new Error(`未知命令: ${command}`);
   }
+
+  await handler(args);
 }
 
 main().catch((error) => {
