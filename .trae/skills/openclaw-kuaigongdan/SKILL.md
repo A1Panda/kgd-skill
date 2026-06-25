@@ -97,6 +97,11 @@ curl --location "${KGD_BASE_URL}/open_api/user/login" \
   - 常用：`code`, `standard`, `category_name`, `unit_name`, `source`, `selling_money`, `commission_settle_money`, `avatars`, `profile`, `remark`, `attachments`
 - 编辑商品关键字段：
   - 必填：`id`, `name`
+- 当前项目 CLI 的商品写入补充能力：
+  - `goods:add --input/--json` 支持传单对象，也支持传对象数组；数组模式会逐条调用接口并汇总结果
+  - `goods:edit --input/--json` 同样支持对象数组逐条编辑
+  - 当 `goods:edit` 的输入里只有 `id`、`fieldValueList` 等局部字段，CLI 会先查询当前商品，再自动补齐 `name`、`code`、`standard`、`unit/unit_name`
+  - 这属于 CLI 层兼容行为，不代表快工单原始 `goods/edit` 接口天然支持增量更新
 - 如果业务上存在“物料编码、用料、HT图号、图纸编码、版本号、是否涂层”等扩展字段：
   - 不要把这些值混进 `name` 或 `remark`
   - 应优先映射到商品扩展字段 `fieldValueList`
@@ -217,6 +222,10 @@ curl --location "${KGD_BASE_URL}/open_api/user/login" \
   - 常用：`stock_type_name`, `shipper_id`, `remark`, `fieldValueList`
 - `item_list` 元素：
   - `goods_id`, `num`, `remark`
+- 当前项目 CLI 的批量能力：
+  - 参数模式仍以单条明细为主
+  - `--input/--json` 模式支持一张单据内传多条 `item_list`
+  - `--input/--json` 也支持顶层传数组，CLI 会按“多张单据”逐条调用接口并汇总结果
 
 ### 其他入库单
 
@@ -227,6 +236,10 @@ curl --location "${KGD_BASE_URL}/open_api/user/login" \
   - 常用：`consignee_id`, `supplier_id`, `stock_type_name`, `remark`, `fieldValueList`
 - `item_list` 元素：
   - `goods_id`, `num`, `cost_price`, `selling_price`, `remark`
+- 当前项目 CLI 的批量能力：
+  - 参数模式仍以单条明细为主
+  - `--input/--json` 模式支持一张单据内传多条 `item_list`
+  - `--input/--json` 也支持顶层传数组，CLI 会按“多张单据”逐条调用接口并汇总结果
 
 ### 成品入库单
 
@@ -237,6 +250,10 @@ curl --location "${KGD_BASE_URL}/open_api/user/login" \
   - 常用：`stock_type_name`, `remark`, `fieldValueList`
 - `item_list` 元素：
   - `produce_bill_id`, `num`, `remark`
+- 当前项目 CLI 的批量能力：
+  - 参数模式仍以单条明细为主
+  - `--input/--json` 模式支持一张单据内传多条 `item_list`
+  - `--input/--json` 也支持顶层传数组，CLI 会按“多张单据”逐条调用接口并汇总结果
 
 ### 合同
 
@@ -250,6 +267,10 @@ curl --location "${KGD_BASE_URL}/open_api/user/login" \
 - 常用：`code`, `linkman_id`, `delivery_date`, `remark`, `address`, `province_code`, `city_code`, `area_code`, `fieldValueList`, `attachments`
 - `item_list` 元素常用字段：
   - `goods_id`, `num`, `unit_price`, `money`, `discount`, `discount_money`, `after_discount_money`, `remark`
+- 当前项目 CLI 的合同新增补充能力：
+  - 参数模式下 `--has-tax` 接受 `1/0/2/是/否`；其中 `0` 和 `2` 都按“不含税”处理
+  - `--input/--json` 模式下若未显式传 `enterprise_id`，CLI 会优先从当前登录上下文中推断并补齐
+  - 合同明细 `unit_price` 在当前 CLI 中没有默认值；参数模式不传会报错，JSON 模式也不会自动猜测
 - 若合同明细需要保留商品侧扩展信息：
   - 优先把客户级字段放在合同头 `fieldValueList`
   - 把物料编码、用料、HT图号、图纸编码、版本号、是否涂层等放在商品或合同明细扩展字段
@@ -445,10 +466,22 @@ node ./scripts/kgd-cli.js else-stock-out:list --keyword 石墨盘 --page 1 --pag
 node ./scripts/kgd-cli.js else-stock-out:add --goods-id 8253995 --num 10 --ware-name 成品仓 --stock-type-name 普通出库 --shipper-id 100753 --dry-run
 ```
 
+- 批量新增其他出库单明细：
+
+```bash
+node ./scripts/kgd-cli.js else-stock-out:add --input ./stock-out-bill.json --dry-run
+```
+
 - 查询其他入库单：
 
 ```bash
 node ./scripts/kgd-cli.js else-stock-in:list --keyword 石墨盘 --page 1 --page-size 20
+```
+
+- 批量新增其他入库单明细：
+
+```bash
+node ./scripts/kgd-cli.js else-stock-in:add --input ./stock-in-bill.json --dry-run
 ```
 
 - 获取最新 token：
@@ -494,10 +527,22 @@ node ./scripts/kgd-cli.js pub-craft:edit --id 123456 --name 打磨 --code GM001 
 node ./scripts/kgd-cli.js goods:add --input ./goods.json
 ```
 
+- 批量新增商品：
+
+```bash
+node ./scripts/kgd-cli.js goods:add --input ./goods-batch.json --dry-run
+```
+
 - 编辑商品：
 
 ```bash
 node ./scripts/kgd-cli.js goods:edit --input ./goods.json
+```
+
+- 仅传局部字段编辑商品：
+
+```bash
+node ./scripts/kgd-cli.js goods:edit --json '{"id":8253995,"fieldValueList":[{"name":"图纸编码","value":"V970B1"}]}' --dry-run
 ```
 
 - 停用商品：
@@ -572,6 +617,12 @@ node ./scripts/kgd-cli.js produce-stock-in:list --keyword JGD0001 --page 1 --pag
 node ./scripts/kgd-cli.js produce-stock-in:add --produce-bill-id 123456 --num 10 --ware-name 成品仓 --stock-type-name 完工入库 --dry-run
 ```
 
+- 批量新增成品入库单：
+
+```bash
+node ./scripts/kgd-cli.js produce-stock-in:add --input ./produce-stock-in-bill.json --dry-run
+```
+
 - 查询生产任务：
 
 ```bash
@@ -612,6 +663,12 @@ node ./scripts/kgd-cli.js contract:list --code HT20260623001
 
 ```bash
 node ./scripts/kgd-cli.js contract:add --input ./contract.json
+```
+
+- 参数模式新增合同，兼容 `has_tax=2`：
+
+```bash
+node ./scripts/kgd-cli.js contract:add --customer-id 1544650 --sales-user-id 144246 --goods-id 8253995 --num 10 --unit-price 100 --delivery-date 2026-06-30 --has-tax 2 --dry-run
 ```
 
 - 编辑合同：

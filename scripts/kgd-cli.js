@@ -74,8 +74,10 @@ function printUsage() {
     "  node ./scripts/kgd-cli.js pub-craft:edit --id 123456 --name 打磨 [--code GM001] [--reportable-user-ids-json '[1001,1002]'] [--dry-run]",
     "  node ./scripts/kgd-cli.js else-stock-out:list [--keyword 石墨盘] [--page 1] [--page-size 20]",
     "  node ./scripts/kgd-cli.js else-stock-out:add --goods-id 8253995 --num 10 --ware-name 成品仓 --stock-type-name 普通出库 --shipper-id 100753 [--bill-date 2026-06-23] [--remark 备注] [--dry-run]",
+    "  node ./scripts/kgd-cli.js else-stock-out:add --input ./stock-out-bill.json [--dry-run]",
     "  node ./scripts/kgd-cli.js else-stock-in:list [--keyword 石墨盘] [--page 1] [--page-size 20]",
     "  node ./scripts/kgd-cli.js else-stock-in:add --goods-id 8253995 --num 10 --ware-name 成品仓 --stock-type-name 普通入库 --consignee-id 100753 [--bill-date 2026-06-23] [--cost-price 0] [--selling-price 0] [--dry-run]",
+    "  node ./scripts/kgd-cli.js else-stock-in:add --input ./stock-in-bill.json [--dry-run]",
     "  node ./scripts/kgd-cli.js customer:list --keyword 聚力 --page 1 --page-size 20",
     "  node ./scripts/kgd-cli.js customer:add --name 聚力 --linkman-name 张三 [--mobile 13800000000] [--province-name 广东省] [--city-name 深圳市] [--area-name 南山区] [--address 科技园] [--dry-run]",
     "  node ./scripts/kgd-cli.js supplier:list --keyword 碳材 --page 1 --page-size 20",
@@ -86,6 +88,7 @@ function printUsage() {
     "  node ./scripts/kgd-cli.js produce-bill:status --id 123456 --type 1 [--cancel-reason 原因] [--dry-run]",
     "  node ./scripts/kgd-cli.js produce-stock-in:list [--keyword JGD0001] [--page 1] [--page-size 20]",
     "  node ./scripts/kgd-cli.js produce-stock-in:add --produce-bill-id 123456 --num 10 --ware-name 成品仓 [--bill-date 2026-06-23] [--stock-type-name 完工入库] [--remark 备注] [--dry-run]",
+    "  node ./scripts/kgd-cli.js produce-stock-in:add --input ./produce-stock-in-bill.json [--dry-run]",
     "  node ./scripts/kgd-cli.js task:list [--produce-bill-code 20260305001-4] [--craft-name 打磨] [--status 未开始] [--all]",
     "  node ./scripts/kgd-cli.js task:status --id 23437544 --status 3 [--dry-run]",
     "  node ./scripts/kgd-cli.js report:list [--produce-craft-id 23437544] [--page 1] [--page-size 20]",
@@ -149,6 +152,87 @@ function isBlankValue(value) {
   return value === undefined || value === null || String(value).trim() === "";
 }
 
+function normalizeWarehouseBillItem(item, itemIndex, commandName, schema) {
+  if (!item || typeof item !== "object" || Array.isArray(item)) {
+    throw new Error(`${commandName} 缺少或错误的字段：item_list[${itemIndex}] 必须为对象`);
+  }
+
+  const nextItem = { ...item };
+  const requiredStringFields = schema.requiredStringFields || [];
+  const optionalStringFields = schema.optionalStringFields || [];
+  const requiredIntegerFields = schema.requiredIntegerFields || [];
+  const requiredNumberFields = schema.requiredNumberFields || [];
+  const optionalNumberFields = schema.optionalNumberFields || [];
+
+  for (const fieldName of requiredStringFields) {
+    nextItem[fieldName] = getRequiredStringValue(nextItem[fieldName], `item_list[${itemIndex}].${fieldName}`, commandName);
+  }
+  for (const fieldName of optionalStringFields) {
+    if (!isBlankValue(nextItem[fieldName])) {
+      nextItem[fieldName] = String(nextItem[fieldName]).trim();
+    }
+  }
+  for (const fieldName of requiredIntegerFields) {
+    nextItem[fieldName] = getRequiredPositiveIntValue(nextItem[fieldName], `item_list[${itemIndex}].${fieldName}`, commandName);
+  }
+  for (const fieldName of requiredNumberFields) {
+    nextItem[fieldName] = getRequiredPositiveNumberValue(nextItem[fieldName], `item_list[${itemIndex}].${fieldName}`, commandName);
+  }
+  for (const fieldName of optionalNumberFields) {
+    if (!isBlankValue(nextItem[fieldName])) {
+      nextItem[fieldName] = getOptionalNumberValue(nextItem[fieldName], `item_list[${itemIndex}].${fieldName}`, commandName);
+    }
+  }
+
+  return nextItem;
+}
+
+function normalizeWarehouseBillPayload(payload, commandName, schema) {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error(`${commandName} 缺少或错误的参数：payload 必须为对象`);
+  }
+
+  const nextPayload = { ...payload };
+  const requiredStringFields = schema.requiredStringFields || [];
+  const optionalStringFields = schema.optionalStringFields || [];
+  const requiredIntegerFields = schema.requiredIntegerFields || [];
+  const optionalIntegerFields = schema.optionalIntegerFields || [];
+
+  nextPayload.bill_date = isBlankValue(nextPayload.bill_date)
+    ? getTodayDateString()
+    : String(nextPayload.bill_date).trim();
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(nextPayload.bill_date)) {
+    throw new Error(`${commandName} 参数错误：bill_date 必须是 YYYY-MM-DD`);
+  }
+
+  for (const fieldName of requiredStringFields) {
+    nextPayload[fieldName] = getRequiredStringValue(nextPayload[fieldName], fieldName, commandName);
+  }
+  for (const fieldName of optionalStringFields) {
+    if (!isBlankValue(nextPayload[fieldName])) {
+      nextPayload[fieldName] = String(nextPayload[fieldName]).trim();
+    }
+  }
+  for (const fieldName of requiredIntegerFields) {
+    nextPayload[fieldName] = getRequiredPositiveIntValue(nextPayload[fieldName], fieldName, commandName);
+  }
+  for (const fieldName of optionalIntegerFields) {
+    if (!isBlankValue(nextPayload[fieldName])) {
+      nextPayload[fieldName] = getRequiredPositiveIntValue(nextPayload[fieldName], fieldName, commandName);
+    }
+  }
+
+  if (!Array.isArray(nextPayload.item_list) || nextPayload.item_list.length === 0) {
+    throw new Error(`${commandName} 缺少或错误的字段：item_list 至少需要一条明细`);
+  }
+
+  nextPayload.item_list = nextPayload.item_list.map((item, index) =>
+    normalizeWarehouseBillItem(item, index, commandName, schema.itemSchema),
+  );
+
+  return nextPayload;
+}
+
 function getRequiredFileArg(args) {
   const fileArg = String(args.file || "").trim();
   if (!fileArg) {
@@ -175,6 +259,41 @@ function getRequiredPositiveNumberArg(args, name, commandName) {
 
 function getOptionalNumberArg(args, name, fallback) {
   return args[name] === undefined ? fallback : toNumber(args[name], fallback);
+}
+
+function getRequiredPositiveIntValue(value, fieldName, commandName) {
+  const parsed = toInt(value, 0);
+  if (!parsed) {
+    throw new Error(`${commandName} 缺少或错误的字段：${fieldName} 必须为正整数`);
+  }
+  return parsed;
+}
+
+function getRequiredPositiveNumberValue(value, fieldName, commandName) {
+  const parsed = toNumber(value, Number.NaN);
+  if (!(parsed > 0)) {
+    throw new Error(`${commandName} 缺少或错误的字段：${fieldName} 必须大于 0`);
+  }
+  return parsed;
+}
+
+function getOptionalNumberValue(value, fieldName, commandName) {
+  if (isBlankValue(value)) {
+    return value;
+  }
+  const parsed = toNumber(value, Number.NaN);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${commandName} 缺少或错误的字段：${fieldName} 必须为数字`);
+  }
+  return parsed;
+}
+
+function getRequiredStringValue(value, fieldName, commandName) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) {
+    throw new Error(`${commandName} 缺少参数：${fieldName}`);
+  }
+  return normalized;
 }
 
 function getTodayDateString() {
@@ -638,6 +757,51 @@ function buildProduceStockInPayloadFromArgs(args) {
   return payload;
 }
 
+function buildElseStockInPayloadFromArgs(args) {
+  const commandName = "else-stock-in:add";
+  const payload = {
+    bill_date: args["bill-date"] ? String(args["bill-date"]).trim() : getTodayDateString(),
+    ware_name: getRequiredStringArg(args, "ware-name", commandName),
+    stock_type_name: getRequiredStringArg(args, "stock-type-name", commandName),
+    consignee_id: toInt(args["consignee-id"], 0),
+    item_list: [
+      {
+        goods_id: toInt(args["goods-id"], 0),
+        num: getRequiredPositiveNumberArg(args, "num", commandName),
+        cost_price: getOptionalNumberArg(args, "cost-price", 0),
+        selling_price: getOptionalNumberArg(args, "selling-price", 0),
+      },
+    ],
+  };
+
+  if (!payload.consignee_id) {
+    throw new Error(`${commandName} 缺少或错误的参数：--consignee-id 必须为正整数`);
+  }
+  if (!payload.item_list[0].goods_id) {
+    throw new Error(`${commandName} 缺少或错误的参数：--goods-id 必须为正整数`);
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.bill_date)) {
+    throw new Error(`${commandName} 参数错误：--bill-date 必须是 YYYY-MM-DD`);
+  }
+  if (args["supplier-id"]) {
+    payload.supplier_id = toInt(args["supplier-id"], 0);
+    if (!payload.supplier_id) {
+      throw new Error(`${commandName} 缺少或错误的参数：--supplier-id 必须为正整数`);
+    }
+  }
+  if (args.remark) {
+    payload.remark = String(args.remark);
+  }
+  if (args["item-remark"]) {
+    payload.item_list[0].remark = String(args["item-remark"]);
+  }
+  if (args["field-values-json"]) {
+    payload.fieldValueList = parseJsonArg(args["field-values-json"], "field-values-json", []);
+  }
+
+  return payload;
+}
+
 function buildPubCraftPayloadFromArgs(args, mode) {
   const commandName = mode === "edit" ? "pub-craft:edit" : "pub-craft:add";
   const payload = {
@@ -988,6 +1152,39 @@ async function commandPubCraftWrite(args, mode) {
   printJson(json);
 }
 
+async function commandWarehouseBillAdd(args, schema) {
+  const rawPayload = hasJsonInput(args) ? loadJsonInput(args) : schema.buildPayloadFromArgs(args);
+  const payloadList = Array.isArray(rawPayload) ? rawPayload : [rawPayload];
+  const normalizedPayloadList = payloadList.map((item) =>
+    normalizeWarehouseBillPayload(item, schema.commandName, schema.payloadSchema),
+  );
+
+  if (toBool(args["dry-run"])) {
+    printJson({
+      dry_run: true,
+      api: schema.apiPath,
+      payload: Array.isArray(rawPayload) ? normalizedPayloadList : normalizedPayloadList[0],
+    });
+    return;
+  }
+
+  const context = await createAuthContext(getAuthOverrides(args));
+  if (Array.isArray(rawPayload)) {
+    const results = [];
+    for (const item of normalizedPayloadList) {
+      results.push(await openApiPost(context, schema.apiPath, item));
+    }
+    printJson({
+      success: true,
+      data: results,
+    });
+    return;
+  }
+
+  const json = await openApiPost(context, schema.apiPath, normalizedPayloadList[0]);
+  printJson(json);
+}
+
 async function commandElseStockOutList(args) {
   const context = await createAuthContext(getAuthOverrides(args));
   const body = {
@@ -1000,19 +1197,21 @@ async function commandElseStockOutList(args) {
 }
 
 async function commandElseStockOutAdd(args) {
-  const payload = hasJsonInput(args) ? loadJsonInput(args) : buildElseStockOutPayloadFromArgs(args);
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/else_stock_out_bill/add",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, "/open_api/else_stock_out_bill/add", payload);
-  printJson(json);
+  await commandWarehouseBillAdd(args, {
+    commandName: "else-stock-out:add",
+    apiPath: "/open_api/else_stock_out_bill/add",
+    buildPayloadFromArgs: buildElseStockOutPayloadFromArgs,
+    payloadSchema: {
+      requiredStringFields: ["ware_name", "stock_type_name"],
+      optionalStringFields: ["remark"],
+      requiredIntegerFields: ["shipper_id"],
+      itemSchema: {
+        requiredIntegerFields: ["goods_id"],
+        requiredNumberFields: ["num"],
+        optionalStringFields: ["remark"],
+      },
+    },
+  });
 }
 
 async function commandElseStockInList(args) {
@@ -1027,53 +1226,23 @@ async function commandElseStockInList(args) {
 }
 
 async function commandElseStockInAdd(args) {
-  const commandName = "else-stock-in:add";
-  const payload = {
-    bill_date: args["bill-date"] ? String(args["bill-date"]).trim() : getTodayDateString(),
-    ware_name: getRequiredStringArg(args, "ware-name", commandName),
-    stock_type_name: getRequiredStringArg(args, "stock-type-name", commandName),
-    consignee_id: toInt(args["consignee-id"], 0),
-    item_list: [
-      {
-        goods_id: toInt(args["goods-id"], 0),
-        num: getRequiredPositiveNumberArg(args, "num", commandName),
-        cost_price: getOptionalNumberArg(args, "cost-price", 0),
-        selling_price: getOptionalNumberArg(args, "selling-price", 0),
+  await commandWarehouseBillAdd(args, {
+    commandName: "else-stock-in:add",
+    apiPath: "/open_api/else_stock_in_bill/add",
+    buildPayloadFromArgs: buildElseStockInPayloadFromArgs,
+    payloadSchema: {
+      requiredStringFields: ["ware_name", "stock_type_name"],
+      optionalStringFields: ["remark"],
+      requiredIntegerFields: ["consignee_id"],
+      optionalIntegerFields: ["supplier_id"],
+      itemSchema: {
+        requiredIntegerFields: ["goods_id"],
+        requiredNumberFields: ["num"],
+        optionalNumberFields: ["cost_price", "selling_price"],
+        optionalStringFields: ["remark"],
       },
-    ],
-  };
-
-  if (!payload.consignee_id) {
-    throw new Error(`${commandName} 缺少或错误的参数：--consignee-id 必须为正整数`);
-  }
-  if (!payload.item_list[0].goods_id) {
-    throw new Error(`${commandName} 缺少或错误的参数：--goods-id 必须为正整数`);
-  }
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(payload.bill_date)) {
-    throw new Error(`${commandName} 参数错误：--bill-date 必须是 YYYY-MM-DD`);
-  }
-  if (args["supplier-id"]) {
-    payload.supplier_id = toInt(args["supplier-id"], 0);
-    if (!payload.supplier_id) {
-      throw new Error(`${commandName} 缺少或错误的参数：--supplier-id 必须为正整数`);
-    }
-  }
-  if (args.remark) {
-    payload.remark = String(args.remark);
-  }
-
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/else_stock_in_bill/add",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, "/open_api/else_stock_in_bill/add", payload);
-  printJson(json);
+    },
+  });
 }
 
 async function commandCustomerList(args) {
@@ -1227,19 +1396,20 @@ async function commandProduceStockInList(args) {
 }
 
 async function commandProduceStockInAdd(args) {
-  const payload = hasJsonInput(args) ? loadJsonInput(args) : buildProduceStockInPayloadFromArgs(args);
-  if (toBool(args["dry-run"])) {
-    printJson({
-      dry_run: true,
-      api: "/open_api/produce_stock_in_bill/add",
-      payload,
-    });
-    return;
-  }
-
-  const context = await createAuthContext(getAuthOverrides(args));
-  const json = await openApiPost(context, "/open_api/produce_stock_in_bill/add", payload);
-  printJson(json);
+  await commandWarehouseBillAdd(args, {
+    commandName: "produce-stock-in:add",
+    apiPath: "/open_api/produce_stock_in_bill/add",
+    buildPayloadFromArgs: buildProduceStockInPayloadFromArgs,
+    payloadSchema: {
+      requiredStringFields: ["ware_name"],
+      optionalStringFields: ["stock_type_name", "remark"],
+      itemSchema: {
+        requiredIntegerFields: ["produce_bill_id"],
+        requiredNumberFields: ["num"],
+        optionalStringFields: ["remark"],
+      },
+    },
+  });
 }
 
 async function commandTaskList(args) {
