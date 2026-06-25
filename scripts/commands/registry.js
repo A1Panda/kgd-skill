@@ -205,7 +205,7 @@ function buildCommandDefinitions(handlers) {
       handler: commandContractAdd,
       usage: [
         "  node ./scripts/kgd-cli.js contract:add --input ./contract.json [--dry-run]",
-        "  node ./scripts/kgd-cli.js contract:add --customer-id 1544650 --sales-user-id 144246 --goods-id 8253995 --num 10 --unit-price 100 --delivery-date 2026-06-30 --has-tax 1 [--linkman-id 1747835] [--money 1000] [--advance 300] [--code HT20260624001] [--remark 备注] [--dry-run]",
+        "  node ./scripts/kgd-cli.js contract:add --customer-id 1544650 --sales-user-id 144246 --goods-id 8253995 --num 10 --unit-price 100 --delivery-date 2026-06-30 --has-tax 1 --remark 备注 [--code HT20260624001] [--linkman-id 1747835] [--money 1000] [--advance 300] [--dry-run]",
       ],
     },
     {

@@ -274,6 +274,10 @@ curl --location "${KGD_BASE_URL}/open_api/user/login" \
 - 常用：`code`, `linkman_id`, `delivery_date`, `remark`, `address`, `province_code`, `city_code`, `area_code`, `fieldValueList`, `attachments`
 - `item_list` 元素常用字段：
   - `goods_id`, `num`, `unit_price`, `money`, `discount`, `discount_money`, `after_discount_money`, `remark`
+- **重要实测发现**：
+  - 合同头级 `remark` **必须有值**，否则快工单 API 会返回"参数校验错误"
+  - 合同头级 `code` 不是硬性必填；缺失时系统可自动生成合同编号
+  - 明细 `remark` 建议填写；若未提供，当前 CLI 应优先用合同头 `remark` 回填，降低接口校验失败风险
 - 当前项目 CLI 的合同新增补充能力：
   - 参数模式下 `--has-tax` 接受 `1/0/2/是/否`；其中 `0` 和 `2` 都按“不含税”处理
   - `--input/--json` 模式下若未显式传 `enterprise_id`，CLI 会优先从当前登录上下文中推断并补齐
@@ -334,7 +338,8 @@ curl --location "${KGD_BASE_URL}/open_api/upload/file" \
 - 用户想“新增出入库单”：
   - 至少确认日期、仓库、明细 `item_list`
 - 用户想“新增合同”：
-  - 至少确认 `enterprise_id`, `customer_id`, `money`, `advance`, `has_tax`, `sales_user_id`
+  - 至少确认 `enterprise_id`, `customer_id`, `money`, `advance`, `has_tax`, `sales_user_id`, `remark`
+  - `code` 可选；不传可由系统生成
 
 ### 对字段不全的处理原则
 

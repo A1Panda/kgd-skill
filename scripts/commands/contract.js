@@ -92,6 +92,23 @@ function buildContractCommands(deps) {
       });
     }
 
+    const contractRemark = String(nextPayload.remark ?? "").trim();
+
+    if (Array.isArray(nextPayload.item_list)) {
+      nextPayload.item_list = nextPayload.item_list.map((item) => {
+        const nextItem = { ...item };
+        if (!String(nextItem.remark ?? "").trim() && contractRemark) {
+          nextItem.remark = contractRemark;
+        }
+        return nextItem;
+      });
+    }
+
+    // 实测：合同 remark 缺失会导致 API 参数校验错误；code 缺失时可由系统自动生成
+    if (!String(nextPayload.remark ?? "").trim()) {
+      throw new Error("contract:add (JSON) 缺少必填字段：remark（合同备注）不能为空");
+    }
+
     if (nextPayload.money !== undefined) {
       nextPayload.money = toMoneyString(nextPayload.money);
     }
@@ -122,9 +139,11 @@ function buildContractCommands(deps) {
       throw new Error(`${commandName} 缺少或错误的参数：--goods-id 必须为正整数`);
     }
 
+    const remark = getRequiredStringArg(args, "remark", commandName);
+
     const num = getRequiredPositiveNumberArg(args, "num", commandName);
     const unitPrice = getRequiredPositiveNumberArg(args, "unit-price", commandName);
-    const itemRemark = args["item-remark"] ? String(args["item-remark"]) : args.remark ? String(args.remark) : "";
+    const itemRemark = args["item-remark"] ? String(args["item-remark"]) : remark;
     const itemMoney =
       args["item-money"] !== undefined
         ? toMoneyString(args["item-money"])
@@ -142,6 +161,7 @@ function buildContractCommands(deps) {
       has_tax: normalizeHasTaxValue(args["has-tax"], commandName),
       money: args.money !== undefined ? toMoneyString(args.money) : afterDiscountMoney,
       advance: args.advance !== undefined ? toMoneyString(args.advance) : "0",
+      remark,
       item_list: [
         {
           goods_id: goodsId,
@@ -165,9 +185,6 @@ function buildContractCommands(deps) {
     }
     if (args.code) {
       payload.code = String(args.code);
-    }
-    if (args.remark) {
-      payload.remark = String(args.remark);
     }
     if (args["enterprise-id"]) {
       payload.enterprise_id = toInt(args["enterprise-id"], 0);
