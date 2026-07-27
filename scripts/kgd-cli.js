@@ -492,7 +492,7 @@ function getAuthOverrides(args) {
   };
 }
 
-const { buildPaginationBody, buildKeywordListBody, createListHandler, createWriteHandler } = createHandlerFactories({
+const { buildPaginationBody, buildScopedListBody, createListHandler, createWriteHandler } = createHandlerFactories({
   createAuthContext,
   getAuthOverrides,
   openApiPost,
@@ -507,7 +507,7 @@ const {
   commandGoodsDisable,
 } = buildGoodsCommands({
   buildGoodsDisablePayloadFromArgs,
-  buildKeywordListBody,
+  buildScopedListBody,
   createAuthContext,
   createListHandler,
   getAuthOverrides,
@@ -532,8 +532,8 @@ const {
   commandReportList,
   commandContractList,
 } = buildListCommands({
-  buildKeywordListBody,
   buildPaginationBody,
+  buildScopedListBody,
   createAuthContext,
   createListHandler,
   getAuthOverrides,

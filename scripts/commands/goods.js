@@ -1,7 +1,7 @@
 function buildGoodsCommands(deps) {
   const {
     buildGoodsDisablePayloadFromArgs,
-    buildKeywordListBody,
+    buildScopedListBody,
     createAuthContext,
     createListHandler,
     getAuthOverrides,
@@ -15,7 +15,19 @@ function buildGoodsCommands(deps) {
   } = deps;
 
   const commandGoodsList = createListHandler("/open_api/goods/list", (args) =>
-    buildKeywordListBody(args, "goods_keyword"),
+    buildScopedListBody(args, {
+      commandName: "goods:list",
+      scopeFields: [
+        { args: ["keyword", "goods-keyword"], field: "goods_keyword" },
+        { arg: "create-user-name", field: "create_user_name" },
+        { arg: "category-name", field: "category_name" },
+        { arg: "source", field: "source", type: "int" },
+        { arg: "is-enable", field: "is_enable", type: "int" },
+        { arg: "supplier-name", field: "supplier_name" },
+        { arg: "updated-at-start", field: "updated_at_start" },
+        { arg: "updated-at-end", field: "updated_at_end" },
+      ],
+    }),
   );
 
   async function completeGoodsEditPayload(context, payload) {

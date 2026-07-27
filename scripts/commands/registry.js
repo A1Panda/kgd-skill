@@ -59,7 +59,7 @@ function buildCommandDefinitions(handlers) {
     {
       name: "goods:list",
       handler: commandGoodsList,
-      usage: ["  node ./scripts/kgd-cli.js goods:list --keyword 石墨盘 --page 1 --page-size 20"],
+      usage: ["  node ./scripts/kgd-cli.js goods:list --keyword 石墨盘 [--updated-at-start 2026-07-01 --updated-at-end 2026-07-31] [--page 1 --page-size 20]"],
     },
     {
       name: "goods:add",
@@ -79,7 +79,7 @@ function buildCommandDefinitions(handlers) {
     {
       name: "pub-craft:list",
       handler: commandPubCraftList,
-      usage: ["  node ./scripts/kgd-cli.js pub-craft:list --keyword 打磨 --page 1 --page-size 20"],
+      usage: ["  node ./scripts/kgd-cli.js pub-craft:list --keyword 打磨 [--updated-at-start 2026-07-01 --updated-at-end 2026-07-31] [--page 1 --page-size 20]"],
     },
     {
       name: "pub-craft:add",
@@ -94,7 +94,7 @@ function buildCommandDefinitions(handlers) {
     {
       name: "else-stock-out:list",
       handler: commandElseStockOutList,
-      usage: ["  node ./scripts/kgd-cli.js else-stock-out:list [--keyword 石墨盘] [--page 1] [--page-size 20]"],
+      usage: ["  node ./scripts/kgd-cli.js else-stock-out:list --code CK20260701001 [--bill-date-start 2026-07-01 --bill-date-end 2026-07-31] [--page 1] [--page-size 20]"],
     },
     {
       name: "else-stock-out:add",
@@ -107,7 +107,7 @@ function buildCommandDefinitions(handlers) {
     {
       name: "else-stock-in:list",
       handler: commandElseStockInList,
-      usage: ["  node ./scripts/kgd-cli.js else-stock-in:list [--keyword 石墨盘] [--page 1] [--page-size 20]"],
+      usage: ["  node ./scripts/kgd-cli.js else-stock-in:list --code RK20260701001 [--bill-date-start 2026-07-01 --bill-date-end 2026-07-31] [--page 1] [--page-size 20]"],
     },
     {
       name: "else-stock-in:add",
@@ -120,7 +120,7 @@ function buildCommandDefinitions(handlers) {
     {
       name: "customer:list",
       handler: commandCustomerList,
-      usage: ["  node ./scripts/kgd-cli.js customer:list --keyword 聚力 --page 1 --page-size 20"],
+      usage: ["  node ./scripts/kgd-cli.js customer:list --keyword 聚力 [--updated-at-start 2026-07-01 --updated-at-end 2026-07-31] [--page 1 --page-size 20]"],
     },
     {
       name: "customer:add",
@@ -130,7 +130,7 @@ function buildCommandDefinitions(handlers) {
     {
       name: "supplier:list",
       handler: commandSupplierList,
-      usage: ["  node ./scripts/kgd-cli.js supplier:list --keyword 碳材 --page 1 --page-size 20"],
+      usage: ["  node ./scripts/kgd-cli.js supplier:list --keyword 碳材 [--updated-at-start 2026-07-01 --updated-at-end 2026-07-31] [--page 1 --page-size 20]"],
     },
     {
       name: "supplier:add",
@@ -140,12 +140,12 @@ function buildCommandDefinitions(handlers) {
     {
       name: "user:list",
       handler: commandUserList,
-      usage: ["  node ./scripts/kgd-cli.js user:list --keyword 于英 --page 1 --page-size 20"],
+      usage: ["  node ./scripts/kgd-cli.js user:list --keyword 于英 [--department-name 生产部] [--page 1 --page-size 20]"],
     },
     {
       name: "produce-bill:list",
       handler: commandProduceBillList,
-      usage: ["  node ./scripts/kgd-cli.js produce-bill:list [--keyword 20260305001-4] [--code JGD0001] [--page 1] [--page-size 20]"],
+      usage: ["  node ./scripts/kgd-cli.js produce-bill:list --code JGD0001 [--status 2] [--updated-at-start 2026-07-01 --updated-at-end 2026-07-31] [--page 1] [--page-size 20]"],
     },
     {
       name: "produce-bill:add",
@@ -160,7 +160,7 @@ function buildCommandDefinitions(handlers) {
     {
       name: "produce-stock-in:list",
       handler: commandProduceStockInList,
-      usage: ["  node ./scripts/kgd-cli.js produce-stock-in:list [--keyword JGD0001] [--page 1] [--page-size 20]"],
+      usage: ["  node ./scripts/kgd-cli.js produce-stock-in:list --code CP20260701001 [--bill-date-start 2026-07-01 --bill-date-end 2026-07-31] [--page 1] [--page-size 20]"],
     },
     {
       name: "produce-stock-in:add",
@@ -173,7 +173,7 @@ function buildCommandDefinitions(handlers) {
     {
       name: "task:list",
       handler: commandTaskList,
-      usage: ["  node ./scripts/kgd-cli.js task:list [--produce-bill-code 20260305001-4] [--craft-name 打磨] [--status 未开始] [--all]"],
+      usage: ["  node ./scripts/kgd-cli.js task:list [--produce-bill-code 20260305001-4] [--craft-name 打磨] [--craft-code 01] [--reportable-user-name 张三] [--quality-able-user-name 李四] [--produce-bill-status 2,5] [--produce-bill-end-time-start 2026-07-01] [--produce-bill-end-time-end 2026-07-31] [--updated-at-start 2026-07-01 --updated-at-end 2026-07-31] [--not-filter-rework 2] [--status 未开始] [--all]"],
     },
     {
       name: "task:status",
@@ -183,7 +183,7 @@ function buildCommandDefinitions(handlers) {
     {
       name: "report:list",
       handler: commandReportList,
-      usage: ["  node ./scripts/kgd-cli.js report:list [--produce-craft-id 23437544] [--page 1] [--page-size 20]"],
+      usage: ["  node ./scripts/kgd-cli.js report:list --produce-bill-code 20260305001-4 [--craft-name 打磨] [--updated-at-start 2026-07-01 --updated-at-end 2026-07-31] [--page 1] [--page-size 20]"],
     },
     {
       name: "report:add",
@@ -198,7 +198,7 @@ function buildCommandDefinitions(handlers) {
     {
       name: "contract:list",
       handler: commandContractList,
-      usage: ["  node ./scripts/kgd-cli.js contract:list [--keyword 聚力] [--code HT20260623001] [--page 1] [--page-size 20]"],
+      usage: ["  node ./scripts/kgd-cli.js contract:list --code HT20260623001 [--goods-keyword 石墨盘] [--updated-at-start 2026-07-01 --updated-at-end 2026-07-31] [--page 1] [--page-size 20]"],
     },
     {
       name: "contract:add",
